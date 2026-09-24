@@ -1,0 +1,13 @@
+# Secrets / credentials
+.env
+.logfire/
+.deepeval/
+
+# Environments & caches
+.venv/
+__pycache__/
+*.py[oc]
+
+# Data (source corpus + generated output)
+DATA/
+processed_data/
