@@ -15,13 +15,14 @@ class Settings:
 
     # --- REASONING ENGINE (GROQ) ---
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    GROQ_MODEL = "llama-3.3-70b-versatile"
+    GROQ_MODEL = "openai/gpt-oss-120b"      # primary: RAG synthesis + planner
+    GROQ_FAST_MODEL = "openai/gpt-oss-20b"  # guardrails gate + Portkey fallback
     GROQ_FALLBACK_API_KEY = os.getenv("GROQ_FALLBACK_API_KEY")
 
     # --- LLM GATEWAY (PORTKEY) ---
     PORTKEY_API_KEY = os.getenv("PORTKEY_API_KEY")
-    GROQ_SLUG =  "rag"     # primary: @rag/llama-3.3-70b-versatile
-    GROQ_SLUG_2 = "brag"  # fallback: @brag/llama-3.1-8b-instant
+    GROQ_SLUG =  "rag"     # primary: @rag/<GROQ_MODEL>
+    GROQ_SLUG_2 = "brag"  # fallback: @brag/<GROQ_FAST_MODEL>
 
     
     # --- OBSERVABILITY ---
