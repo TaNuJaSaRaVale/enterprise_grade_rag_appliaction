@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import streamlit as st
 import requests
 import time
@@ -7,10 +8,38 @@ import uuid
 import logfire
 from dotenv import load_dotenv
 
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 # Load environment variables explicitly from the root directory
-env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".env"))
+env_path = os.path.join(REPO_ROOT, ".env")
 load_dotenv(dotenv_path=env_path)
+
+# Two ways to reach the RAG backend:
+#   BACKEND_URL set   → HTTP to the FastAPI service (Docker image, local two-process setup)
+#   BACKEND_URL unset → call the same query() in-process (single-process hosts, e.g. Streamlit Cloud)
+BACKEND_URL = os.getenv("BACKEND_URL")
+
+
+@st.cache_resource(show_spinner="Starting the RAG engine (first load takes ~1 min)...")
+def _inprocess_backend():
+    """Import the FastAPI module once per server and run its startup (NeMo init) once."""
+    # Repo root must come FIRST: this file is ui/app.py, so a bare `import app` from ui/
+    # would import this UI file instead of the backend package app/
+    if sys.path[0] != REPO_ROOT:
+        sys.path.insert(0, REPO_ROOT)
+    import app.main as backend
+    backend.initialize_rails()
+    return backend
+
+
+def call_backend(prompt: str, session_id: str) -> dict:
+    if BACKEND_URL:
+        response = requests.post(f"{BACKEND_URL}/query", json={"q": prompt, "thread_id": session_id}, timeout=120)
+        return response.json()
+    backend = _inprocess_backend()
+    result = backend.query(backend.QueryRequest(q=prompt, thread_id=session_id))
+    # query() returns a dict, or a JSONResponse for errors / rate limits
+    return json.loads(result.body) if hasattr(result, "body") else result
 
 
 # Initialize Logfire
@@ -122,12 +151,7 @@ if prompt := st.chat_input("Ask about your documentation..."):
                 try:
                     # DISTRIBUTED TRACE: Calling Backend
                     with logfire.span("📡 Calling RAG Backend"):
-                        # Get backend URL from env, or default to local if not set
-                        base_url = os.getenv("BACKEND_URL", "http://localhost:8000")
-                        url = f"{base_url}/query"
-                        payload = {"q": prompt, "thread_id": st.session_state.session_id}
-                        response = requests.post(url, json=payload, timeout=60)
-                        data = response.json()
+                        data = call_backend(prompt, st.session_state.session_id)
                     
                     # Show Reasoning Steps from Backend
                     steps = data.get("thought_process", [])
