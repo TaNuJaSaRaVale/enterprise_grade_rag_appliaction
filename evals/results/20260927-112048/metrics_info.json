@@ -1,0 +1,8 @@
+{
+  "scored_at": "2026-09-27T08:29:11.530217+00:00",
+  "judge_model": "openai/gpt-oss-20b",
+  "embedding_model": "sentence-transformers/all-mpnet-base-v2",
+  "ragas_version": "0.4.3",
+  "deepeval_version": "4.2.6",
+  "tokens_per_minute_budget": 7000
+}

@@ -1,13 +1,20 @@
 """
-The judge LLM for evaluation — one Qwen-on-Groq connection, two thin adapters:
+The judge LLM for evaluation — one Groq connection, two thin adapters:
 
-    QwenDeepEvalJudge        → the interface DeepEval expects (DeepEvalBaseLLM)
+    GroqDeepEvalJudge        → the interface DeepEval expects (DeepEvalBaseLLM)
     get_ragas_llm()          → the interface Ragas 0.4 metrics expect (Instructor-based)
     get_ragas_embeddings()   → local embeddings for Ragas Answer Relevancy (no API quota)
 
-Why Qwen and not the app's gpt-oss: a judge from a different model family reduces
-self-grading bias. Why direct Groq and not Portkey: the Portkey API key has a locked
-default config that routes every call to gpt-oss, and its cache could return stale verdicts.
+Judge choice: qwen/qwen3.8-27b (a different model family from the app's gpt-oss-120b, to
+avoid self-grading bias) was tried first, but Groq's free tier caps it at 1,000 OUTPUT
+tokens per minute and reserves the full max_tokens per request — ~1 judge call per minute,
+and long answers could not be judged at all. gpt-oss-20b with reasoning_effort="low" passes
+those limits, is the fastest, and uses the fewest output tokens (measured: 259 vs 447).
+Known risk: it shares a model family with the answer model, so verdicts may be biased in its
+favour — spot-check verdicts by hand, and compare scores only between runs with the same judge.
+
+Why direct Groq and not Portkey: the Portkey API key has a locked default config that routes
+every call to gpt-oss-120b, and its cache could return stale verdicts.
 """
 import asyncio
 import os
@@ -27,7 +34,9 @@ from deepeval.models import DeepEvalBaseLLM
 
 load_dotenv()
 
-JUDGE_MODEL = "qwen/qwen3.8-27b"
+JUDGE_MODEL = "openai/gpt-oss-20b"
+# gpt-oss is a reasoning model; "low" keeps hidden reasoning (which counts as output tokens) small
+JUDGE_REASONING_EFFORT = "low"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 EMBEDDING_MODEL = "sentence-transformers/all-mpnet-base-v2"  # already cached as the app's fallback
 
@@ -39,6 +48,7 @@ TIMEOUT_S = 60
 # Stay below it with a margin because token counts are estimated.
 TOKENS_PER_MINUTE = 7000
 EXPECTED_OUTPUT_TOKENS = 600  # judge verdicts observed at 45–170 tokens; generous margin
+MAX_WAIT_STEP_S = 2.0
 
 
 class TokenBudget:
@@ -68,7 +78,9 @@ class TokenBudget:
                 entry = [now, tokens]  # list, so settle() can correct it in place
                 self._calls.append(entry)
                 return 0.0, entry
-            return self.window_s - (now - self._calls[0][0]) + 0.05, None
+            # Re-check at least every MAX_WAIT_STEP_S: settle() may free budget long before the
+            # oldest entry expires (measured: sleeping to expiry cost ~60s per golden)
+            return min(self.window_s - (now - self._calls[0][0]) + 0.05, MAX_WAIT_STEP_S), None
 
     def settle(self, entry, actual_tokens):
         """Replace the pessimistic estimate with real usage so the window stays accurate."""
@@ -94,6 +106,14 @@ class TokenBudget:
 _budget = TokenBudget(TOKENS_PER_MINUTE)
 
 
+def _judge_kwargs(kwargs: dict) -> dict:
+    """Added at the one choke point both libraries pass through, so neither can drop it.
+    Only for gpt-oss models — other models may reject the parameter."""
+    if "gpt-oss" in str(kwargs.get("model", "")):
+        kwargs.setdefault("reasoning_effort", JUDGE_REASONING_EFFORT)
+    return kwargs
+
+
 def _estimate_tokens(request: dict) -> int:
     chars = sum(len(str(m.get("content", ""))) for m in request.get("messages", []))
     return chars // 4 + EXPECTED_OUTPUT_TOKENS
@@ -114,6 +134,7 @@ def _sync_client():
     create = client.chat.completions.create
 
     def paced_create(*args, **kwargs):  # every DeepEval judge call passes through the budget
+        kwargs = _judge_kwargs(kwargs)
         entry = _budget.acquire_sync(_estimate_tokens(kwargs))
         response = create(*args, **kwargs)
         _budget.settle(entry, getattr(getattr(response, "usage", None), "total_tokens", None))
@@ -130,6 +151,7 @@ def _async_client():
     create = client.chat.completions.create
 
     async def paced_create(*args, **kwargs):  # every Ragas (and async DeepEval) call passes through
+        kwargs = _judge_kwargs(kwargs)
         entry = await _budget.acquire_async(_estimate_tokens(kwargs))
         response = await create(*args, **kwargs)
         _budget.settle(entry, getattr(getattr(response, "usage", None), "total_tokens", None))
@@ -139,7 +161,7 @@ def _async_client():
     return client
 
 
-class QwenDeepEvalJudge(DeepEvalBaseLLM):
+class GroqDeepEvalJudge(DeepEvalBaseLLM):
     """
     DeepEval adapter. DeepEval calls generate(prompt, schema=PydanticModel) when it
     wants structured output (see deepeval/models/base_model.py generate_with_schema).
@@ -174,10 +196,16 @@ class QwenDeepEvalJudge(DeepEvalBaseLLM):
         return schema.model_validate_json(content) if schema is not None else content
 
 
+# Ragas defaults to max_tokens=1024; long answers (many statements) produced verdict JSON
+# longer than that → truncated → IncompleteOutputException (seen on arch-003 faithfulness).
+JUDGE_MAX_OUTPUT_TOKENS = 4096
+
+
 def get_ragas_llm():
     """Ragas 0.4 metrics take an Instructor-based LLM; Groq is OpenAI-compatible."""
     from ragas.llms import llm_factory
-    return llm_factory(JUDGE_MODEL, provider="openai", client=_async_client(), temperature=0)
+    return llm_factory(JUDGE_MODEL, provider="openai", client=_async_client(),
+                       temperature=0, max_tokens=JUDGE_MAX_OUTPUT_TOKENS)
 
 
 @lru_cache(maxsize=1)

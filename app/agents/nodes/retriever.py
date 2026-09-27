@@ -38,6 +38,8 @@ def retrieve_node(state: AgentState):
     status = "Found technical context." if formatted_docs else "No relevant documentation found."
     return {
         "documents": formatted_docs,
+        # rerank_score is absent only if reranking failed and fell back to Qdrant order
+        "retrieval_scores": [round(doc.get("rerank_score", 0.0), 4) for doc in reranked],
         "status": status,
         "plan": state["plan"] + ["Context Retrieved" if formatted_docs else "Context: None relevant"]
     }

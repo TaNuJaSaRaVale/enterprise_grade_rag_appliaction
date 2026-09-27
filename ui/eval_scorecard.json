@@ -1,0 +1,26 @@
+{
+  "run_id": "20260927-112048",
+  "judge_model": "openai/gpt-oss-20b",
+  "goldens_total": 20,
+  "goldens_scored": 13,
+  "source_hit_rate": 0.706,
+  "avg_latency_s": 8.64,
+  "metrics": {
+    "context_recall": {
+      "mean": 0.596,
+      "n": 13
+    },
+    "context_precision": {
+      "mean": 0.674,
+      "n": 13
+    },
+    "faithfulness": {
+      "mean": 0.745,
+      "n": 11
+    },
+    "answer_relevancy": {
+      "mean": 0.706,
+      "n": 13
+    }
+  }
+}

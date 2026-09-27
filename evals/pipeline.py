@@ -145,6 +145,7 @@ def run_single(golden: dict, run_id: str) -> dict:
             "messages": [{"role": "user", "content": question}],
             "current_query": question,
             "documents": [],
+            "retrieval_scores": [],
             "plan": ["Start"],
             "status": "Initializing Graph...",
         }

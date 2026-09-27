@@ -50,7 +50,11 @@ def _format_history(messages: list[dict]) -> str:
     return "\n".join(lines) or "(no previous messages)"
 
 
-def _build_context(documents: list[str]) -> str:
+def trim_documents(documents: list[str]) -> list[str]:
+    """
+    The context-size rule for the LLM. Public so evals/metrics.py judges exactly what
+    the LLM was shown — change limits here and the eval follows automatically.
+    """
     # Trim oversized docs instead of dropping them — skipping a doc larger than the
     # budget used to leave the LLM with an empty context for whole-PDF chunks.
     context, used = [], 0
@@ -64,7 +68,11 @@ def _build_context(documents: list[str]) -> str:
             doc = doc[:budget] + "\n[...truncated]"
         context.append(doc)
         used += len(doc)
-    return "\n\n---\n\n".join(context)
+    return context
+
+
+def _build_context(documents: list[str]) -> str:
+    return "\n\n---\n\n".join(trim_documents(documents))
 
 
 def generate_node(state: AgentState):

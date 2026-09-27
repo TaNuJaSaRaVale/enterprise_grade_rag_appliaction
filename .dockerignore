@@ -1,0 +1,17 @@
+# Secrets — never bake into an image
+.env
+.env.*
+
+# Local environments, caches, tooling
+.venv/
+__pycache__/
+*.py[oc]
+.git/
+.claude/
+.logfire/
+.deepeval/
+
+# Data and generated outputs (the app reads from Qdrant Cloud, not local files)
+DATA/
+processed_data/
+evals/

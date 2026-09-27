@@ -1,3 +1,4 @@
+import json
 import os
 import streamlit as st
 import requests
@@ -37,6 +38,19 @@ st.set_page_config(
 AI_AVATAR = "🤖"
 USER_AVATAR = "👤"
 
+SCORECARD_PATH = os.path.join(os.path.dirname(__file__), "eval_scorecard.json")
+
+
+def render_confidence(confidence, source_files):
+    """Confidence badge (from reranker scores, not the LLM) + the files the answer came from."""
+    level = (confidence or {}).get("level")
+    if level and level != "n/a":
+        score = confidence.get("top_score")
+        text = f"**Confidence: {level}**" + (f" (relevance {score:.2f})" if score is not None else "") + f" — {confidence.get('reason', '')}"
+        {"High": st.success, "Medium": st.info, "Low": st.warning}.get(level, st.error)(text)
+    if source_files:
+        st.caption("📚 Sources: " + ", ".join(source_files))
+
 
 # --- SESSION MANAGEMENT ---
 if "session_id" not in st.session_state:
@@ -60,6 +74,27 @@ with st.sidebar:
         st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
 
+    # --- EVAL SCORECARD (measured offline with Ragas; see evals/) ---
+    st.markdown("---")
+    st.subheader("📊 Measured Quality")
+    try:
+        with open(SCORECARD_PATH) as f:
+            card = json.load(f)
+        st.caption(f"Baseline eval · {card['goldens_scored']}/{card['goldens_total']} golden questions scored · "
+                   f"judge: {card['judge_model']}")
+        cols = st.columns(2)
+        cols[0].metric("Source hit rate", f"{card['source_hit_rate']:.2f}")
+        cols[1].metric("Avg latency", f"{card['avg_latency_s']:.1f}s")
+        labels = {"faithfulness": "Faithfulness", "answer_relevancy": "Answer relevancy",
+                  "context_recall": "Context recall", "context_precision": "Context precision"}
+        cols = st.columns(2)
+        for i, (key, label) in enumerate(labels.items()):
+            m = card["metrics"].get(key, {})
+            if m.get("mean") is not None:
+                cols[i % 2].metric(label, f"{m['mean']:.2f}", help=f"Averaged over {m['n']} questions (N/A excluded)")
+    except FileNotFoundError:
+        st.caption("Scorecard not generated yet (python -m evals.export_scorecard).")
+
 # --- MAIN CHAT ---
 st.title("🤖 Enterprise Agentic Assistant")
 
@@ -69,6 +104,8 @@ for message in st.session_state.messages:
     avatar = AI_AVATAR if message["role"] == "assistant" else USER_AVATAR
     with st.chat_message(message["role"], avatar=avatar):
         st.markdown(message["content"])
+        if message["role"] == "assistant":
+            render_confidence(message.get("confidence"), message.get("source_files"))
 
 # Chat Input
 if prompt := st.chat_input("Ask about your documentation..."):
@@ -125,5 +162,9 @@ if prompt := st.chat_input("Ask about your documentation..."):
                 time.sleep(0.005)
             
             answer_placeholder.markdown(full_answer)
-            st.session_state.messages.append({"role": "assistant", "content": full_answer})
+            render_confidence(data.get("confidence"), data.get("source_files"))
+            st.session_state.messages.append({
+                "role": "assistant", "content": full_answer,
+                "confidence": data.get("confidence"), "source_files": data.get("source_files"),
+            })
             logfire.info("✅ Chat cycle completed successfully.")

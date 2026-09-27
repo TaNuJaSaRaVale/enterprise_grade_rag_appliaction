@@ -1,0 +1,24 @@
+# Runtime-only dependencies for the Docker image (API + Streamlit UI).
+# Pinned to the versions verified locally. Excludes eval (ragas, deepeval), ingestion parsers,
+# and torch/sentence-transformers (the 768-dim fallback cannot query the 3072-dim collection anyway).
+# langchain-community 0.3.31: last version with chat_models.vertexai that accepts langchain-core 1.x.
+fastapi==0.141.1
+uvicorn[standard]==0.53.0
+python-dotenv==1.2.3
+requests==2.34.2
+streamlit==1.64.0
+numpy==2.5.3
+pydantic==2.13.5
+qdrant-client==1.19.1
+flashrank==0.2.10
+langchain==1.4.2
+langgraph==1.2.12
+langchain-core==1.6.5
+langchain-groq==1.1.3
+langchain-openai==1.6.6
+langchain-google-genai==4.4.0
+langchain-community==0.3.31
+langsmith==0.14.0
+nemoguardrails==0.24.1
+portkey-ai==2.3.4
+logfire[fastapi,requests]==5.1.0
