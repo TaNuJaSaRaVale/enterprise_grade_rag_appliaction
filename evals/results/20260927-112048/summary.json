@@ -1,0 +1,17 @@
+{
+  "total": 20,
+  "completed": 20,
+  "errors": 0,
+  "error_ids": [],
+  "guard_blocked_ids": [],
+  "source_hit_rate": 0.706,
+  "source_miss_ids": [
+    "cron-001",
+    "cron-002",
+    "cron-003",
+    "vpa-001",
+    "vpa-002"
+  ],
+  "avg_latency_s": 8.64,
+  "cache_hits": 0
+}

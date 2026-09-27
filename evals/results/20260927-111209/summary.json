@@ -1,0 +1,15 @@
+{
+  "total": 3,
+  "completed": 3,
+  "errors": 0,
+  "error_ids": [],
+  "guard_blocked_ids": [],
+  "source_hit_rate": 0.0,
+  "source_miss_ids": [
+    "cron-001",
+    "cron-002",
+    "cron-003"
+  ],
+  "avg_latency_s": 9.36,
+  "cache_hits": 0
+}

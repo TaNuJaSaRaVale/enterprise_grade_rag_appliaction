@@ -1,0 +1,18 @@
+{
+  "run_id": "20260927-112048",
+  "started_at": "2026-09-27T05:50:48.762527+00:00",
+  "git_commit": "c702821",
+  "git_dirty": true,
+  "dirty_files": [
+    "evals/results/"
+  ],
+  "golden_file": "golden_dataset.json",
+  "golden_count": 20,
+  "limit": null,
+  "models": {
+    "llm": "openai/gpt-oss-120b",
+    "fast_llm": "openai/gpt-oss-20b",
+    "reranker": "ms-marco-MiniLM-L-12-v2",
+    "min_rerank_score": 0.1
+  }
+}
