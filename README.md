@@ -1,20 +1,14 @@
----
-title: Enterprise Agentic RAG
-emoji: 🤖
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
----
-
 # Enterprise Agentic RAG
 
 An agentic Retrieval-Augmented Generation assistant for enterprise IT documentation (Kubernetes, Intel hardware, networking) — with guardrails, an LLM gateway, **a confidence signal that tells users when the docs don't support an answer**, and **an offline evaluation pipeline that measures quality instead of guessing it**.
 
-**Live demo:** _add your Hugging Face Space link here_
+**Live demo:** https://agentic-rag-d.streamlit.app
 
-Built entirely on free tiers (Groq, Gemini, Qdrant Cloud, Portkey, Logfire, Hugging Face Spaces).
+**Try:** "In the nginx HPA example, what replica range is used?" · "What updateMode options does VPA support?" · "How do I set up Istio mTLS?" (not in docs) · "tell me a joke" (guardrail)
+
+> The demo sleeps when idle — the first question after a wake-up can take about a minute while models load.
+
+Built entirely on free tiers (Groq, Gemini, Qdrant Cloud, Portkey, Logfire, Streamlit Community Cloud).
 
 ---
 
@@ -135,6 +129,7 @@ Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKE
 ## Known limitations & roadmap
 
 - **Chunking:** PDFs/HTML without paragraph breaks become single oversized chunks → add a size-bounded splitter with overlap and re-ingest (the eval pipeline is in place to measure the gain).
+- **Confidence is wording-sensitive** until chunking is fixed: the reranker only reads the start of oversized chunks, so rephrasing can move the same correct answer from Low (0.24) to High (0.86). The badge errs toward under-confidence, not over-confidence.
 - **Ingestion reliability:** failures are logged, not surfaced → add a per-file ingestion report and a post-ingest verification of chunk counts in Qdrant.
 - **Memory** is in-process (`MemorySaver`) → move to a persistent checkpointer (Postgres).
 - **Judge bias:** the judge shares a model family with the answer model → spot-check verdicts; move to a cross-family judge when limits allow.
