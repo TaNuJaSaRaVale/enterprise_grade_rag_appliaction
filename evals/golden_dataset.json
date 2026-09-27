@@ -1,0 +1,162 @@
+[
+  {
+    "id": "cron-001",
+    "question": "Which restart policies can a Kubernetes Job's Pods use, and what happens with each one?",
+    "ground_truth": "Jobs allow two restart policies. With OnFailure, the kubelet restarts the container inside the same Pod if it crashes. With Never, the whole Pod is marked as failed and the Job controller creates a new Pod. Always is not allowed because it would prevent the Pod from ever completing.",
+    "expected_source": "cronjobs.docx",
+    "type": "simple_fact",
+    "tags": ["jobs", "restart-policy"]
+  },
+  {
+    "id": "cron-002",
+    "question": "How do completions, parallelism, and completion modes work together to control how a Job runs its Pods?",
+    "ground_truth": "completions sets how many Pods must finish successfully before the Job is complete. parallelism sets the maximum number of Pods running at the same time. In NonIndexed mode, the default, all Pods are identical. In Indexed mode, each Pod gets a unique completion index through the JOB_COMPLETION_INDEX environment variable, so it can process its own slice of the data.",
+    "expected_source": "cronjobs.docx",
+    "type": "multi_part",
+    "tags": ["jobs", "parallelism"]
+  },
+  {
+    "id": "cron-003",
+    "question": "What is a CronJob, what schedule strings would run a task every 15 minutes and every Monday at 9 AM, and what does @weekly mean?",
+    "ground_truth": "A CronJob is a thin wrapper around Jobs that automatically creates Job objects on a schedule written in cron format. Every 15 minutes is \"*/15 * * * *\". Every Monday at 9:00 AM is \"0 9 * * 1\". The @weekly shorthand runs every Sunday at midnight.",
+    "expected_source": "cronjobs.docx",
+    "type": "multi_part",
+    "tags": ["cronjobs", "schedule"]
+  },
+  {
+    "id": "hpa-001",
+    "question": "What has to be installed before HPA or VPA will work, and how can I check that it is collecting data?",
+    "ground_truth": "The Metrics Server must be installed, because it collects the resource usage metrics from nodes and pods that autoscaling decisions depend on. You can check its pods are running in the kube-system namespace, and confirm metrics are collected with kubectl top nodes and kubectl top pods --all-namespaces, which should show CPU and memory usage.",
+    "expected_source": "pods_autoscale.html",
+    "type": "multi_part",
+    "tags": ["autoscaling", "metrics-server"]
+  },
+  {
+    "id": "hpa-002",
+    "question": "In the nginx autoscaling example, what replica range and CPU target does the HorizontalPodAutoscaler use?",
+    "ground_truth": "The HPA targets the hpa-deploy Deployment and scales it between 1 and 10 replicas (minReplicas 1, maxReplicas 10), aiming to keep average CPU utilization around 50%.",
+    "expected_source": "pods_autoscale.html",
+    "type": "simple_fact",
+    "tags": ["autoscaling", "hpa"]
+  },
+  {
+    "id": "vpa-001",
+    "question": "What updateMode options does a VerticalPodAutoscaler support, and what does each do?",
+    "ground_truth": "Off only gives recommendations and never changes resource requirements. Initial assigns resource requests only when a Pod is created and never changes them later. Recreate assigns requests at creation and updates existing Pods by evicting and recreating them. Auto recreates the Pod based on the recommendation.",
+    "expected_source": "pods_autoscale.html",
+    "type": "simple_fact",
+    "tags": ["autoscaling", "vpa"]
+  },
+  {
+    "id": "vpa-002",
+    "question": "In the VPA demo the CPU maxAllowed was 200m, so why did the Pods' CPU request only rise to 126m?",
+    "ground_truth": "The VPA bases its recommendation on the CPU usage it actually observes, and 126m was enough for that usage. It adjusts requests incrementally to avoid sudden large changes. maxAllowed is a ceiling rather than a target, so the VPA only goes up to 200m if observed usage justifies it.",
+    "expected_source": "pods_autoscale.html",
+    "type": "reasoning",
+    "tags": ["autoscaling", "vpa"]
+  },
+  {
+    "id": "hpa-003",
+    "question": "When should I choose HPA and when should I choose VPA?",
+    "ground_truth": "HPA suits stateless applications that can scale horizontally by adding Pods, especially with variable workloads or high-availability needs. VPA suits applications where horizontal scaling is not feasible, or where you want to optimise resources for individual Pods, such as stateful applications or those with varying resource needs.",
+    "expected_source": "pods_autoscale.html",
+    "type": "comparison",
+    "tags": ["autoscaling", "hpa", "vpa"]
+  },
+  {
+    "id": "mon-001",
+    "question": "How do I see the logs of only the pods that belong to a job called hello-job, and how do I stream logs live?",
+    "ground_truth": "Find the job's pods by label with kubectl get pods -l job-name=hello-job, then view a pod's output with kubectl logs <pod-name>. To follow the logs in real time, add the -f flag: kubectl logs -f <pod-name>.",
+    "expected_source": "monitor_job.docx",
+    "type": "multi_part",
+    "tags": ["jobs", "monitoring", "logs"]
+  },
+  {
+    "id": "mon-002",
+    "question": "What do the COMPLETIONS and DURATION columns of kubectl get jobs mean, and which statuses can a job be in?",
+    "ground_truth": "COMPLETIONS shows the number of completed pods out of the desired completions, and DURATION shows how long the job took to run. A job can be Active (still running), Completed (finished successfully), or Failed (failed after reaching its backoff limit).",
+    "expected_source": "monitor_job.docx",
+    "type": "multi_part",
+    "tags": ["jobs", "monitoring"]
+  },
+  {
+    "id": "pwq-001",
+    "question": "What are the main steps of the fine-grained parallel processing work queue example, and what stores the queue?",
+    "ground_truth": "There are three steps: start a storage service to hold the work queue, which is Redis; create a queue and fill it with messages; and start a Job that works on tasks from the queue.",
+    "expected_source": "parallel_work_queue.txt",
+    "type": "simple_fact",
+    "tags": ["jobs", "work-queue", "redis"]
+  },
+  {
+    "id": "pwq-002",
+    "question": "In the Redis work-queue Job, how does each worker know when to stop, and what is suggested instead for a continuous stream of background work?",
+    "ground_truth": "Each worker loops while the queue is not empty, leasing an item, processing it, and marking it complete. When the queue is empty it exits, and workers signal the queue is empty by exiting with success. For a continuous stream of background work, the example suggests running background workers with a ReplicaSet instead, or using a background processing library such as Resque.",
+    "expected_source": "parallel_work_queue.txt",
+    "type": "multi_part",
+    "tags": ["jobs", "work-queue"]
+  },
+  {
+    "id": "dbx-001",
+    "question": "What are the ways to run a Databricks job from the CLI, and how is using submit different?",
+    "ground_truth": "A job runs automatically on its schedule if its JSON definition includes one; databricks jobs run-now triggers a run of a job that already exists; and databricks jobs submit takes a job definition and triggers a run. With submit, the job is not saved and is not visible in the UI: it runs once and then no longer exists as a job.",
+    "expected_source": "job_management.html",
+    "type": "multi_part",
+    "tags": ["databricks", "jobs", "cli"]
+  },
+  {
+    "id": "dbx-002",
+    "question": "Which REST API request does the databricks jobs get CLI command correspond to?",
+    "ground_truth": "Because the Databricks CLI wraps the REST API, databricks jobs get maps to GET /api/2.2/jobs/get.",
+    "expected_source": "job_management.html",
+    "type": "simple_fact",
+    "tags": ["databricks", "rest-api"]
+  },
+  {
+    "id": "arch-001",
+    "question": "What roles do etcd and kube-apiserver play in the Kubernetes control plane?",
+    "ground_truth": "etcd is the cluster datastore: a strongly consistent, highly available key-value store that persists cluster state. kube-apiserver provides the REST interface into the control plane and datastore. All clients, including nodes and users, interact with the cluster only through it, and it handles authentication, authorization, request validation, mutation, and admission control.",
+    "expected_source": "architecture.pptx",
+    "type": "multi_part",
+    "tags": ["architecture", "control-plane"]
+  },
+  {
+    "id": "arch-002",
+    "question": "What are the four Kubernetes Service types and how does each expose the service?",
+    "ground_truth": "ClusterIP, the default, exposes the service on a cluster-internal IP only. NodePort exposes it on each node's IP at a statically defined port. LoadBalancer works with a cloud provider to expose it outside the cluster on a static external IP. ExternalName references endpoints outside the cluster through a static internally referenced DNS name.",
+    "expected_source": "architecture.pptx",
+    "type": "simple_fact",
+    "tags": ["architecture", "networking", "services"]
+  },
+  {
+    "id": "arch-003",
+    "question": "After I apply a Deployment with kubectl, what happens behind the scenes until the Pod is running?",
+    "ground_truth": "kubectl validates the manifest and sends it to the apiserver, which authenticates, authorizes, and runs admission control before storing it in etcd. The Deployment controller then creates a ReplicaSet, and the ReplicaSet controller requests the desired number of Pods, which enter the Pending phase. The scheduler picks a suitable node and binds the Pod to it. Finally the kubelet on that node prepares the Pod, starts a pause container, plumbs the network through CNI, pulls images, runs any init containers, and then starts the main containers.",
+    "expected_source": "architecture.pptx",
+    "type": "reasoning",
+    "tags": ["architecture", "deployment-flow"]
+  },
+  {
+    "id": "oos-001",
+    "question": "How do I configure BGP route reflectors on a Juniper router?",
+    "ground_truth": "The internal documentation does not cover BGP route reflector configuration. The assistant should say it could not find this in the documentation and must not invent device-specific commands.",
+    "expected_source": null,
+    "type": "out_of_scope",
+    "tags": ["out-of-scope", "networking"]
+  },
+  {
+    "id": "oos-002",
+    "question": "How do I set up Argo CD to do GitOps deployments to my cluster?",
+    "ground_truth": "The internal documentation does not cover Argo CD or GitOps. The assistant should say it could not find this in the documentation and must not present general knowledge as if it came from the docs.",
+    "expected_source": null,
+    "type": "out_of_scope",
+    "tags": ["out-of-scope", "kubernetes"]
+  },
+  {
+    "id": "oos-003",
+    "question": "How do I enable mutual TLS between services with Istio?",
+    "ground_truth": "The internal documentation does not cover Istio or service-mesh mTLS. The assistant should say it could not find this in the documentation and must not invent configuration.",
+    "expected_source": null,
+    "type": "out_of_scope",
+    "tags": ["out-of-scope", "networking", "security"]
+  }
+]
