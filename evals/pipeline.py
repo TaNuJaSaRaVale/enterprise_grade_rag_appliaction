@@ -287,6 +287,13 @@ def main():
     load_dotenv()
     logfire.configure(token=os.getenv("LOGFIRE_TOKEN"), service_name="rag-evals", console=False)
 
+    # A dependency enables root INFO logging; NeMo then logs every internal event and httpx
+    # every request, drowning the progress lines. Raise only these to WARNING so real
+    # warnings/errors (e.g. 429s) still show. Spans still go to Logfire.
+    import logging
+    for noisy in ("nemoguardrails", "httpx"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
     run_id = args.resume or datetime.now().strftime("%Y%m%d-%H%M%S")
     run_dir = RESULTS_DIR / run_id
     if args.resume and not run_dir.exists():
