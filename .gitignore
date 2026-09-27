@@ -2,6 +2,8 @@
 .env
 .logfire/
 .deepeval/
+.claude/
+.gitignore/
 
 # Environments & caches
 .venv/
