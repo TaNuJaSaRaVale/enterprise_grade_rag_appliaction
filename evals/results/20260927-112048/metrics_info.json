@@ -1,5 +1,5 @@
 {
-  "scored_at": "2026-09-27T08:29:11.530217+00:00",
+  "scored_at": "2026-09-28T12:47:43.768022+00:00",
   "judge_model": "openai/gpt-oss-20b",
   "embedding_model": "sentence-transformers/all-mpnet-base-v2",
   "ragas_version": "0.4.3",

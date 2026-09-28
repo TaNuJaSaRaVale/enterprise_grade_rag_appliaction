@@ -1,0 +1,118 @@
+{
+  "goldens": 20,
+  "metrics": {
+    "context_recall": {
+      "mean": 0.691,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "cron-001",
+          "score": 0.0
+        },
+        {
+          "id": "hpa-003",
+          "score": 0.0
+        },
+        {
+          "id": "vpa-001",
+          "score": 0.0
+        }
+      ]
+    },
+    "context_precision": {
+      "mean": 0.736,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "cron-001",
+          "score": 0.0
+        },
+        {
+          "id": "cron-003",
+          "score": 0.0
+        },
+        {
+          "id": "vpa-001",
+          "score": 0.0
+        }
+      ]
+    },
+    "faithfulness": {
+      "mean": 0.78,
+      "n": 15,
+      "n_not_applicable": 5,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "mon-001",
+          "score": 0.375
+        },
+        {
+          "id": "cron-001",
+          "score": 0.4444
+        },
+        {
+          "id": "cron-003",
+          "score": 0.4615
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "mean": 0.734,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "vpa-002",
+          "score": 0.4275
+        },
+        {
+          "id": "pwq-001",
+          "score": 0.4779
+        },
+        {
+          "id": "cron-003",
+          "score": 0.5828
+        }
+      ]
+    }
+  },
+  "by_type": {
+    "comparison": {
+      "context_recall": 0.0,
+      "context_precision": 1.0,
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.65
+    },
+    "multi_part": {
+      "context_recall": 0.844,
+      "context_precision": 0.813,
+      "faithfulness": 0.765,
+      "answer_relevancy": 0.756
+    },
+    "out_of_scope": {
+      "context_recall": null,
+      "context_precision": null,
+      "faithfulness": null,
+      "answer_relevancy": null
+    },
+    "reasoning": {
+      "context_recall": 0.5,
+      "context_precision": 0.5,
+      "faithfulness": 0.833,
+      "answer_relevancy": 0.615
+    },
+    "simple_fact": {
+      "context_recall": 0.667,
+      "context_precision": 0.667,
+      "faithfulness": 0.749,
+      "answer_relevancy": 0.757
+    }
+  },
+  "goldens_with_errors": []
+}

@@ -67,9 +67,6 @@ st.set_page_config(
 AI_AVATAR = "🤖"
 USER_AVATAR = "👤"
 
-SCORECARD_PATH = os.path.join(os.path.dirname(__file__), "eval_scorecard.json")
-
-
 def render_confidence(confidence, source_files):
     """Confidence badge (from reranker scores, not the LLM) + the files the answer came from."""
     level = (confidence or {}).get("level")
@@ -102,27 +99,6 @@ with st.sidebar:
         st.session_state.messages = []
         st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
-
-    # --- EVAL SCORECARD (measured offline with Ragas; see evals/) ---
-    st.markdown("---")
-    st.subheader("📊 Measured Quality")
-    try:
-        with open(SCORECARD_PATH) as f:
-            card = json.load(f)
-        st.caption(f"Baseline eval · {card['goldens_scored']}/{card['goldens_total']} golden questions scored · "
-                   f"judge: {card['judge_model']}")
-        cols = st.columns(2)
-        cols[0].metric("Source hit rate", f"{card['source_hit_rate']:.2f}")
-        cols[1].metric("Avg latency", f"{card['avg_latency_s']:.1f}s")
-        labels = {"faithfulness": "Faithfulness", "answer_relevancy": "Answer relevancy",
-                  "context_recall": "Context recall", "context_precision": "Context precision"}
-        cols = st.columns(2)
-        for i, (key, label) in enumerate(labels.items()):
-            m = card["metrics"].get(key, {})
-            if m.get("mean") is not None:
-                cols[i % 2].metric(label, f"{m['mean']:.2f}", help=f"Averaged over {m['n']} questions (N/A excluded)")
-    except FileNotFoundError:
-        st.caption("Scorecard not generated yet (python -m evals.export_scorecard).")
 
 # --- MAIN CHAT ---
 st.title("🤖 Enterprise Agentic Assistant")

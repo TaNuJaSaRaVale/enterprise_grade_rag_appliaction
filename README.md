@@ -25,7 +25,7 @@ Built entirely on free tiers (Groq, Gemini, Qdrant Cloud, Portkey, Logfire, Stre
 
 Thresholds are calibrated on this corpus: passages that answered golden questions scored 0.98–0.99; unrelated ones ~0.0.
 
-**2. Quality is measured.** A golden dataset + LLM-as-judge pipeline (Ragas) scores retrieval and generation separately, and the numbers are shown in the app's sidebar.
+**2. Quality is measured.** A golden dataset + LLM-as-judge pipeline (Ragas) scores retrieval and generation separately — see [Evaluation](#evaluation) for the numbers and what they revealed.
 
 ---
 
@@ -66,23 +66,40 @@ flowchart LR
 3. **`metrics.py`** — Ragas Context Recall / Context Precision / Faithfulness / Answer Relevancy with an LLM judge; applicability rules (N/A is never averaged as 0); the judge sees exactly the context the LLM saw.
 4. **`judge.py`** — judge adapters for Ragas and DeepEval with a sliding-window token budget that keeps runs inside Groq's free-tier limits.
 
+### What each metric means
+
+| Metric | Question it answers | Measures |
+|---|---|---|
+| Source hit rate | Did retrieval return the document the answer lives in? | Retrieval |
+| Context Recall | Do the retrieved passages contain the facts needed for the correct answer? | Retrieval |
+| Context Precision | Are the relevant passages ranked above the irrelevant ones? | Retrieval / reranking |
+| Faithfulness | Is every claim in the answer supported by the retrieved passages (no hallucination)? | Generation |
+| Answer Relevancy | Does the answer address the question that was asked? | Generation |
+
+All scores are 0–1, higher is better. Retrieval and generation are scored separately so a bad answer can be traced to its cause: wrong passages, or a wrong use of the right passages.
+
 ### Baseline results (before retrieval fixes)
 
 | Metric | Score | n |
 |---|---|---|
-| Source hit rate (right document retrieved) | 0.71 | 17 |
-| Context Recall | 0.60 | 13 |
-| Context Precision | 0.67 | 13 |
-| Faithfulness | 0.75 | 11 |
-| Answer Relevancy | 0.71 | 13 |
+| Source hit rate | 0.71 | 17 |
+| Context Recall | 0.69 | 17 |
+| Context Precision | 0.74 | 17 |
+| Faithfulness | 0.78 | 15 |
+| Answer Relevancy | 0.73 | 17 |
 
-Judge: `openai/gpt-oss-20b`. 13 of 17 in-scope questions were scored before the judge's free daily token quota ran out.
+Run `20260927-112048` · judge `openai/gpt-oss-20b` · all 17 in-scope goldens scored, 0 judge errors. The 3 out-of-scope goldens have no correct passage to find, so these metrics don't apply to them.
+
+**Why `n` differs:** a metric that does not apply is marked N/A and left out of the average — never counted as 0. Faithfulness has n=15 because two questions retrieved nothing, and an answer cannot be faithful or unfaithful to no context (their Context Recall/Precision *are* counted, as a measured 0).
+
+**Rate limits:** scoring takes ~15k judge tokens per golden, and Groq's free tier allows 200k per day. The run hit the daily limit after 13 goldens; because results are written per golden and the scorer resumes, the remaining ones were scored the next day against the same answers, the same judge and the same code — so all 17 are comparable.
 
 ### What the evals found
 
 - **A document that was never indexed.** All three CronJob questions missed their source: ingestion had silently dropped `cronjobs.docx` (errors were only logged). Found by the first eval run, not by manual testing.
 - **Whole documents stored as single chunks.** VPA questions returned "not in docs" although the answer exists: the article was one 17.7k-character chunk and the cross-encoder only reads the first ~512 tokens, where only HPA content is. The same file answered HPA questions correctly.
 - **Judge choice changes scores.** The same answer scored Faithfulness 0.68 with a Qwen judge and 1.0 with gpt-oss-20b — so runs are only compared under the same judge, and verdicts are spot-checked.
+- **The judge can be lenient.** A spot-check of `hpa-003` (HPA vs VPA) found Faithfulness 1.0 although the answer included details ("stateless", "batch jobs") that were not in the trimmed context the LLM saw. Its Context Recall of 0.0 is accurate — it is the oversized-chunk problem again: the VPA part of the 17.7k-character chunk is trimmed away before the LLM sees it.
 
 ---
 
@@ -112,8 +129,7 @@ streamlit run ui/app.py                   # terminal 2
 Evaluation:
 ```bash
 python -m evals.pipeline                  # run the golden set through the system
-python -m evals.metrics --run <RUN_ID>    # score it
-python -m evals.export_scorecard --run <RUN_ID>
+python -m evals.metrics --run <RUN_ID>    # score it (re-run the same command to resume after a rate limit)
 ```
 
 Docker:
