@@ -20,6 +20,8 @@ def route_planner(state: AgentState):
     """
     Routes the workflow based on the planner's decision.
     """
+    if state["current_query"] == "OFF_TOPIC":
+        return "end"  # planner already set the fixed reply — no retrieval, no LLM call
     if state["current_query"] == "CONVERSATIONAL":
         return "responder"
     return "retriever"
@@ -33,7 +35,8 @@ workflow.add_conditional_edges(
     route_planner,
     {
         "retriever": "retriever",
-        "responder": "responder"
+        "responder": "responder",
+        "end": END
     }
 )
 

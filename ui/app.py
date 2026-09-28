@@ -57,15 +57,60 @@ except Exception as e:
 
 
 # --- PAGE CONFIG ---
+APP_NAME = "KubeRAG"
 st.set_page_config(
-    page_title="Enterprise Agentic RAG",
-    page_icon="🤖",
+    page_title=f"{APP_NAME} · Enterprise Docs Assistant",
+    page_icon="☸️",
     layout="wide",
 )
 
 # --- AVATARS ---
-AI_AVATAR = "🤖"
+AI_AVATAR = "☸️"
 USER_AVATAR = "👤"
+
+# --- KUBERNETES THEME ---
+# CSS instead of .streamlit/config.toml: the Docker image copies only app/ and ui/, so a
+# root config file would not reach it. Colours use transparency so they read in light AND dark mode.
+K8S_BLUE = "#326CE5"
+st.markdown(f"""
+<style>
+.k8s-hero {{
+    background: linear-gradient(135deg, {K8S_BLUE} 0%, #1A4FB8 100%);
+    color: #FFFFFF; border-radius: 14px; padding: 1.1rem 1.4rem; margin-bottom: 1rem;
+    display: flex; align-items: center; gap: 1rem;
+}}
+.k8s-hero .helm {{ font-size: 2.6rem; line-height: 1; }}
+.k8s-hero h1 {{ color: #FFFFFF; font-size: 1.7rem; margin: 0; padding: 0; }}
+.k8s-hero p {{ color: rgba(255,255,255,0.88); margin: 0.2rem 0 0 0; font-size: 0.95rem; }}
+.k8s-card {{
+    border: 1px solid rgba(50,108,229,0.35); background: rgba(50,108,229,0.07);
+    border-radius: 12px; padding: 0.9rem 1.1rem; margin-bottom: 1rem;
+}}
+.k8s-chip {{
+    display: inline-block; border: 1px solid rgba(50,108,229,0.45); background: rgba(50,108,229,0.10);
+    border-radius: 999px; padding: 0.1rem 0.6rem; margin: 0.15rem 0.2rem 0.15rem 0; font-size: 0.8rem;
+}}
+[data-testid="stSidebar"] {{ border-right: 3px solid {K8S_BLUE}; }}
+[data-testid="stSidebar"] .stButton button {{ text-align: left; justify-content: flex-start; }}
+[data-testid="stSidebar"] .stButton button[kind="primary"] {{ background: {K8S_BLUE}; border-color: {K8S_BLUE}; }}
+[data-testid="stChatInput"] {{ border: 1px solid {K8S_BLUE}; border-radius: 12px; }}
+@media (max-width: 640px) {{
+    .k8s-hero {{ padding: 0.8rem 1rem; }}
+    .k8s-hero h1 {{ font-size: 1.3rem; }}
+    .k8s-hero .helm {{ font-size: 2rem; }}
+}}
+</style>
+""", unsafe_allow_html=True)
+
+# Questions the current index answers well, plus one that shows the honest "not in docs" path
+EXAMPLE_QUESTIONS = [
+    ("📈 HPA replica range", "In the nginx HPA example, what replica range is used?"),
+    ("🏛️ etcd & API server", "What roles do etcd and kube-apiserver play in the Kubernetes control plane?"),
+    ("📬 Work queue Jobs", "How does a Job process a parallel work queue?"),
+    ("🔍 Not in the docs", "How do I set up Istio mTLS?"),
+]
+KNOWLEDGE_BASE_TOPICS = ["Autoscaling (HPA/VPA)", "Jobs & CronJobs", "Cluster architecture",
+                         "Monitoring Jobs", "Work queues", "Intel 5-level paging"]
 
 def render_confidence(confidence, source_files):
     """Confidence badge (from reranker scores, not the LLM) + the files the answer came from."""
@@ -89,19 +134,47 @@ if "messages" not in st.session_state:
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.title("🧠 Agent OS")
+    st.title(f"☸️ {APP_NAME}")
+    st.caption("Agentic RAG for Kubernetes & infrastructure docs")
+
+    st.markdown("**What's in the knowledge base**")
+    st.markdown("".join(f'<span class="k8s-chip">{t}</span>' for t in KNOWLEDGE_BASE_TOPICS),
+                unsafe_allow_html=True)
+
+    st.markdown("**Try asking**")
+    for label, question in EXAMPLE_QUESTIONS:
+        if st.button(label, help=question, width="stretch"):
+            st.session_state.pending_prompt = question
+
     st.markdown("---")
-    st.success(f"Logfire: {LOGFIRE_STATUS}")
-    st.info(f"Memory ID: {st.session_state.session_id[:8]}")
-    
-    if st.button("🗑️ Clear History & Memory", width="stretch", type="primary"):
+    if st.button("🗑️ New conversation", width="stretch", type="primary"):
         logfire.warn(f"🗑️ Memory Wipe Triggered for session: {st.session_state.session_id}")
         st.session_state.messages = []
         st.session_state.session_id = str(uuid.uuid4())
         st.rerun()
+    st.caption(f"🔭 Tracing: {LOGFIRE_STATUS}")
 
 # --- MAIN CHAT ---
-st.title("🤖 Enterprise Agentic Assistant")
+st.markdown(f"""
+<div class="k8s-hero">
+  <div class="helm">☸️</div>
+  <div>
+    <h1>{APP_NAME}</h1>
+    <p>Ask questions about your Kubernetes and infrastructure documentation. Every answer cites its
+    sources and shows how well the docs support it.</p>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+if not st.session_state.messages:
+    st.markdown("""
+<div class="k8s-card">
+<b>How it works:</b> your question passes guardrails, is rewritten into a search query, matched
+against the indexed docs and reranked; the answer is written only from the passages found.
+The confidence badge under each answer comes from the retrieval scores, not from the model's own opinion.
+Pick a question on the left or type your own below.
+</div>
+""", unsafe_allow_html=True)
 
 
 # Display history
@@ -113,7 +186,9 @@ for message in st.session_state.messages:
             render_confidence(message.get("confidence"), message.get("source_files"))
 
 # Chat Input
-if prompt := st.chat_input("Ask about your documentation..."):
+# A sidebar example button sets pending_prompt; it is handled exactly like typed input
+typed = st.chat_input("Ask about your Kubernetes documentation...")
+if prompt := (typed or st.session_state.pop("pending_prompt", None)):
     # START TRACE: User Interaction
     with logfire.span("💬 User Chat Interaction", user_query=prompt, session_id=st.session_state.session_id):
         

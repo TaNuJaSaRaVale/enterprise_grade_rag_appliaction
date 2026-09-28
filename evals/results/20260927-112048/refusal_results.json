@@ -1,0 +1,38 @@
+{
+  "run_id": "20260927-112048",
+  "goldens": 3,
+  "honest_refusal_rate": 1.0,
+  "n": 3,
+  "results": [
+    {
+      "id": "oos-001",
+      "passed": true,
+      "checks": {
+        "states_not_in_docs": true,
+        "labels_general_advice": true,
+        "no_doc_citations": true
+      },
+      "answer_opening": "I couldn't find this in the internal documentation.\n\n**General guidance (not from the docs):**  \n1. **Enable BGP and def"
+    },
+    {
+      "id": "oos-002",
+      "passed": true,
+      "checks": {
+        "states_not_in_docs": true,
+        "labels_general_advice": true,
+        "no_doc_citations": true
+      },
+      "answer_opening": "The provided documentation does not cover Argo CD or GitOps workflows.\n\n**General guidance (not from the docs):**\n\n1. **"
+    },
+    {
+      "id": "oos-003",
+      "passed": true,
+      "checks": {
+        "states_not_in_docs": true,
+        "labels_general_advice": true,
+        "no_doc_citations": true
+      },
+      "answer_opening": "I couldn't find this in the internal documentation.\n\n**General guidance (not from the docs):**\n\n1. **Install Istio with "
+    }
+  ]
+}

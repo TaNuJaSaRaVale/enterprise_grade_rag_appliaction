@@ -54,6 +54,8 @@ def _confidence(final_output: dict) -> dict:
     """How well the documentation supports this answer — derived from retrieval, not the LLM."""
     if final_output.get("current_query") == "CONVERSATIONAL":
         return {"level": "n/a", "top_score": None, "reason": "Conversational reply — no documents needed."}
+    if final_output.get("current_query") == "OFF_TOPIC":
+        return {"level": "n/a", "top_score": None, "reason": "Outside the assistant's domain."}
     scores = final_output.get("retrieval_scores") or []
     if not scores:
         return {"level": "Not in docs", "top_score": None,
