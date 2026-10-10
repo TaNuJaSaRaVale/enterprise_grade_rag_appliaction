@@ -14,6 +14,10 @@ class Settings:
     # Overridable so a re-ingest can build a new collection while the live demo keeps the old one
     QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "enterprise_rag")
 
+    # --- CONVERSATION MEMORY (POSTGRES / NEON) ---
+    # Optional. Unset -> in-process memory that is lost on restart
+    DATABASE_URL = os.getenv("DATABASE_URL")
+
     # --- REASONING ENGINE (GROQ) ---
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     GROQ_MODEL = "openai/gpt-oss-120b"      # primary: RAG synthesis + planner

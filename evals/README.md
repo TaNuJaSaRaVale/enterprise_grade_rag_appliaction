@@ -152,6 +152,19 @@ So decomposition did what it was built for (recall), cost a little precision, an
 
 The number of in-scope goldens that were split fell from 10 of 17 (v2 prompt) to 7 of 17 (v3 prompt). The v3 prompt tells the planner not to split questions whose parts are about the same thing.
 
+### Run `20261010-175028` — tightened answer prompt (judge scoring in progress)
+
+Same collection and retrieval code as `20261009-143328`; the only change is the responder's prompt (answers must come from the excerpts, no general guidance when the docs fully answer).
+
+| Check (no judge needed) | `20261009-143328` | `20261010-175028` |
+|---|---|---|
+| Source hit rate | 17/17 | 17/17 |
+| Honest refusal | 3/3 | 3/3 |
+| In-scope answers with a "General guidance" block | 7 | 0 |
+| Median in-scope answer length | 150 words | 78 words |
+
+The four judge metrics for this run are being scored over two days (daily judge limit) and will be added as a fourth column above. Until then, the effect on faithfulness is expected but **not yet measured**.
+
 Things to know before quoting these:
 
 - `pwq-002` is the one retrieval failure in run `20261003-211038` (0 chunks retrieved). Query decomposition fixed it in run `20261009-143328`. The fix was tuned on this one golden, so treat it as "works here", not "proven in general".

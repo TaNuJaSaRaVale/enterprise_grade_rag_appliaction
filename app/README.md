@@ -66,6 +66,7 @@ The thresholds were calibrated on this corpus: chunks that answered golden quest
 | `GROQ_FAST_MODEL` | `openai/gpt-oss-20b` | guardrails LLM object + Portkey fallback |
 | `GROQ_SLUG`, `GROQ_SLUG_2` | `rag`, `brag` | Portkey provider slugs for the primary and fallback Groq keys |
 | `QDRANT_COLLECTION` | env `QDRANT_COLLECTION`, default `enterprise_rag` | see history below |
+| `DATABASE_URL` | env, optional | Postgres connection string for conversation memory; unset means in-process memory (see [agents/README.md](agents/README.md#memory)) |
 | `LANGSMITH_*` | env | copied into the `LANGCHAIN_*` variables LangChain reads |
 
 Model names are constants in code, keys come from `.env`. A model change must be made here **and** in the Portkey dashboard config (see [gateway/README.md](gateway/README.md)).
@@ -82,3 +83,4 @@ Model names are constants in code, keys come from `.env`. A model change must be
 | Added `confidence` and `source_files` to the response | The LLM's own confidence is not trustworthy; the reranker score is a measured signal of whether the docs support the answer. This is the project's "it knows when it doesn't know" feature. |
 | `QDRANT_COLLECTION` became env-overridable | The re-ingest with the new chunker was built in a second collection (`enterprise_rag_v2`) while the live demo kept reading `enterprise_rag`. Switching the demo is one environment variable; rolling back is deleting it. |
 | Sync `/query` endpoint calling `rag_agent.invoke` | Running the graph synchronously keeps Logfire's context variables, so the trace stays in one piece. |
+| `DATABASE_URL` setting and `durability="exit"` on the graph call | Conversation memory moved to Postgres so it survives restarts; saving once per turn keeps it to one database write per question. |

@@ -8,6 +8,7 @@ The agent is a small, explicit graph of three nodes. Each node is a plain functi
 |---|---|
 | `state.py` | `AgentState` — the dictionary every node reads and writes |
 | `graph.py` | Wires the nodes, the routing rule and the memory checkpointer; exports `rag_agent` |
+| `memory.py` | `build_checkpointer()` — Postgres memory when `DATABASE_URL` is set, in-process memory otherwise |
 | `nodes/planner.py` | One LLM call: classify intent, rewrite the question into a search query, split multi-part questions |
 | `nodes/retriever.py` | Vector search in Qdrant, de-duplicate, rerank, label chunks |
 | `nodes/responder.py` | Write the final answer from the chunks (or say the docs don't cover it) |
@@ -76,7 +77,7 @@ Picks one of three system prompts:
 | Situation | Prompt | Behaviour |
 |---|---|---|
 | `current_query == "CONVERSATIONAL"` | `CONVERSATIONAL_SYSTEM_PROMPT` | Short reply from the history; no invented technical facts |
-| Documents were retrieved | `TECHNICAL_SYSTEM_PROMPT` | Answer grounded in the numbered excerpts with `[n]` citations; anything extra must be labelled "General guidance (not from the docs):" |
+| Documents were retrieved | `TECHNICAL_SYSTEM_PROMPT` | Answer only from the numbered excerpts, with `[n]` citations. Commands, code and YAML must be copied from the excerpts. General guidance is allowed **only** when the excerpts do not fully answer, labelled "General guidance (not from the docs):", at most three short bullets and no code. |
 | Technical, nothing retrieved | `NO_CONTEXT_SYSTEM_PROMPT` | Must begin "I couldn't find this in the internal documentation." |
 
 - `trim_documents()` is the context-size rule: at most 10,000 characters per chunk and 25,000 in total. Oversized chunks are **trimmed**, not dropped. It is public because `evals/metrics.py` calls it so the judge sees exactly the context the LLM saw.
@@ -85,7 +86,27 @@ Picks one of three system prompts:
 
 ## Memory
 
-`graph.py` compiles the graph with `MemorySaver`, keyed by `thread_id`. Memory lives in the process: it is lost on restart and not shared between instances. Moving to a Postgres checkpointer is on the roadmap.
+The graph is compiled with a **checkpointer**: after each turn LangGraph saves the state under the request's `thread_id`, and loads it again on the next turn of the same thread. That is how "what schedule format does **it** use?" can be understood as a question about the CronJob from the previous turn.
+
+`memory.py` picks the checkpointer once, at startup:
+
+| `DATABASE_URL` | Checkpointer | Memory lives | Used for |
+|---|---|---|---|
+| set | `PostgresSaver` (Neon Postgres) | in the database: survives restarts, shared by all instances | the deployed demo |
+| not set | `MemorySaver` | in the process: lost on restart | local runs, evals |
+
+Details that matter:
+
+- **Fallback instead of crash.** If Postgres cannot be reached at startup (wrong URL, Neon down), the app logs an error and starts with `MemorySaver`. The connection attempt waits up to 15 seconds. A failure *during* a request is not caught here: that request returns the API's normal error reply.
+- **Connection pool** of at most 4 connections. Each connection is checked before use, because Neon's free tier suspends the database after a few idle minutes and drops its connections. The first request after a suspend is about a second slower. The Neon project is in a US region, close to the Streamlit Cloud servers; from a laptop in India each database round trip takes about 0.3 s, so local runs with `DATABASE_URL` set are 2–3 seconds slower per question.
+- **`prepare_threshold=None`**, because Neon's pooled endpoint (PgBouncer) does not support prepared statements.
+- **Tables are created automatically** by `saver.setup()` on first start (`checkpoints`, `checkpoint_blobs`, `checkpoint_writes`, `checkpoint_migrations`).
+- **One write per question.** `main.py` calls the graph with `durability="exit"`, so the state is saved once when the turn ends, not after every node.
+- **Evals never write to Postgres.** `evals/pipeline.py` blanks `DATABASE_URL` before the app is imported; each golden has its own throwaway thread and would only fill the free database.
+
+Not done yet: old threads are never deleted, so the tables grow slowly with use. Every saved turn also contains that turn's retrieved chunks.
+
+Known gap found while testing memory: the embedding guardrail (layer 1) answers "What did I just ask you?" with its own capabilities reply, so that message never reaches the graph. Follow-up questions that use the history ("how do I check **its** logs?") work.
 
 ## What changed while building this, and why
 
@@ -105,3 +126,6 @@ Picks one of three system prompts:
 | Sub-query prompt, version 3: **copy the user's words**, with one worked example; do not split same-topic questions | Version 2 still reworded the user: "suggested instead" became "recommended approach ... in Redis". The cross-encoder scored that 0.011 on the right chunk; the user's own wording scores 0.61. `pwq-002` got worse (1 chunk, run `20261009-141503`), and 10 of 17 goldens were split, several of them single-topic. With version 3 `pwq-002` retrieves the right chunk and answers both parts, and 7 of 17 goldens are split (run `20261009-143328`). The example in the prompt is deliberately about a different subject than the golden, so the prompt does not contain the eval's answer. |
 
 **Honest limit of this fix.** It was tuned while looking at one golden (`pwq-002`). The other 16 in-scope goldens did not get worse, but one question is thin evidence that decomposition works for every multi-part question. The planner is an LLM, so it can still reword a sub-query now and then. More multi-part goldens are the next check.
+| Memory: `MemorySaver` → Postgres checkpointer when `DATABASE_URL` is set (`memory.py`) | In-process memory was lost on every restart, and Streamlit Cloud restarts the demo whenever it wakes from sleep or redeploys. Tested against a local Postgres and then against Neon (state written by one process was read back by a new one). With the local Postgres and the full app: a follow-up question asked from a **new process** ("What schedule format does it use?") was rewritten to "Kubernetes CronJob schedule format cron syntax". |
+| `durability="exit"` on the graph call | The default saves after every node (four writes per question). Only the end-of-turn state is needed for conversation memory, and each write is a network round trip to Neon. Measured: 2 turns → 2 saved checkpoints. |
+| Responder prompt tightened: every statement from the excerpts, code only copied from them, no general guidance when the docs fully answer | The scored run `20261009-143328` showed answers adding things the docs do not say: `pwq-002` got faithfulness 0.25 for invented Redis command details and a YAML example. After the change (run `20261010-175028`) the same question is answered in 55 words instead of 190, with no invented example. Across the 17 in-scope goldens, answers with a "General guidance" block went from 7 to 0, and the median answer became about half as long. Source hit rate (17/17) and honest refusal (3/3) are unchanged. The judge scores for this run were still being produced when this was written; see [`../../evals/README.md`](../../evals/README.md). |

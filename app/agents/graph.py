@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, END
-from langgraph.checkpoint.memory import MemorySaver
+from app.agents.memory import build_checkpointer
 from app.agents.state import AgentState
 from app.agents.nodes.planner import planner_node
 from app.agents.nodes.retriever import retrieve_node
@@ -45,9 +45,10 @@ workflow.add_edge("retriever", "responder")
 workflow.add_edge("responder", END)
 
 
-# --- MEMORY UPGRADE ---
-# MemorySaver allows the agent to remember conversations based on 'thread_id'
-checkpointer = MemorySaver()
+# --- MEMORY ---
+# The checkpointer lets the agent remember a conversation by its 'thread_id':
+# Postgres when DATABASE_URL is set, in-process otherwise (see memory.py)
+checkpointer = build_checkpointer()
 
 
 # 4. Compile the Graph with Memory

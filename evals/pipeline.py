@@ -288,6 +288,9 @@ def main():
     import logfire
     from dotenv import load_dotenv
     load_dotenv()
+    # Evals use in-process memory: every golden has its own throwaway thread, and writing
+    # those to the Postgres checkpointer would only fill the free database
+    os.environ["DATABASE_URL"] = ""
     logfire.configure(token=os.getenv("LOGFIRE_TOKEN"), service_name="rag-evals", console=False)
 
     # A dependency enables root INFO logging; NeMo then logs every internal event and httpx

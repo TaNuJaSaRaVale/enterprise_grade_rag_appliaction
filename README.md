@@ -51,7 +51,8 @@ flowchart LR
 
 | Layer | Choice | Why |
 |---|---|---|
-| Orchestration | LangGraph (planner → retriever → responder) with per-thread memory | Explicit, inspectable agent flow |
+| Orchestration | LangGraph (planner → retriever → responder) | Explicit, inspectable agent flow |
+| Memory | LangGraph checkpointer per `thread_id`: Neon Postgres when `DATABASE_URL` is set, in-process otherwise | Follow-up questions keep working after a restart; local runs and evals need no database |
 | Guardrails | Layer 1: NeMo Guardrails, `embeddings_only` intent matching · Layer 2: planner LLM `off_topic` intent | Layer 1 is free and instant for common cases; layer 2 generalises to any topic at no extra LLM call (the planner already runs) |
 | Ingestion | Size-bounded chunker (1,200 characters, 200 overlap), per-file report, post-ingest count check in Qdrant | The reranker only reads about 512 tokens, so a chunk must be small enough to be judged as a whole |
 | Retrieval | Gemini embeddings → Qdrant Cloud → FlashRank `ms-marco-MiniLM-L-12-v2`, min-score cutoff; multi-part questions are searched once per part | Cross-encoder reranking removes irrelevant chunks before they reach the LLM |
@@ -234,7 +235,7 @@ docker build -t enterprise-rag .
 docker run -p 7860:7860 --env-file .env enterprise-rag
 ```
 
-Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKEY_API_KEY`, `GEMINI_API_KEY`, `QDRANT_CLUSTER_ENDPOINT`, `QDRANT_API_KEY`; optional: `LOGFIRE_TOKEN`, `LANGSMITH_API_KEY` (set `LANGSMITH_TRACING=false` without it), `JUDGE_GROQ` (evals).
+Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKEY_API_KEY`, `GEMINI_API_KEY`, `QDRANT_CLUSTER_ENDPOINT`, `QDRANT_API_KEY`; optional: `DATABASE_URL` (Neon Postgres connection string for persistent memory), `QDRANT_COLLECTION`, `LOGFIRE_TOKEN`, `LANGSMITH_API_KEY` (set `LANGSMITH_TRACING=false` without it), `JUDGE_GROQ` (evals).
 
 ---
 
@@ -246,6 +247,8 @@ Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKE
 - **Query decomposition is tested on few questions** → add more multi-part goldens whose answers sit in different chunks.
 - **Answers sometimes add details that are not in the retrieved text** (unsupported specifics on `pwq-002`, an extra "General guidance" block on `arch-002` in one run); the judge counts them as unsupported → tighten the responder prompt.
 - **Scores vary between runs.** Each configuration was run once on 17 questions → repeat runs to report a range, and add more goldens.
-- **Memory** is in-process (`MemorySaver`) → move to a persistent checkpointer (Postgres).
+- **Done — persistent memory:** conversation memory moved from in-process to a Postgres checkpointer (Neon free tier), with a fallback to in-process memory if the database is unreachable.
+- **Memory housekeeping:** old conversation threads are never deleted → add a scheduled clean-up of threads older than a few days.
+- **"What did I just ask?" is caught by the layer-1 guardrail** and gets the capabilities reply instead of an answer from memory → add it as a passing example in the rails.
 - **Judge bias:** the judge shares a model family with the answer model → spot-check verdicts; move to a cross-family judge when limits allow.
 - **Guardrails:** two layers now (embeddings + planner LLM), but the planner is evaluated on a small set that influenced its prompt → evaluate on a fresh, larger unseen set; add a dedicated prompt-injection classifier for injections hidden inside long technical questions.

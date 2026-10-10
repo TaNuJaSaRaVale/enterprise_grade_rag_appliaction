@@ -137,7 +137,7 @@ def query(request: QueryRequest):
         "messages": [{"role": "user", "content": q}],
         "current_query": q,
         "documents": [],
-        "retrieval_scores": [],  # reset per turn — MemorySaver would otherwise carry the last turn's scores
+        "retrieval_scores": [],  # reset per turn — the checkpointer would otherwise carry the last turn's scores
         "plan": ["Start"],
         "status": "Initializing Graph..."
     }
@@ -162,7 +162,9 @@ def query(request: QueryRequest):
 
         # Gate 2: LangGraph RAG pipeline
         # Run the graph synchronously to preserve Logfire context variables
-        final_output = rag_agent.invoke(initial_state, config=config)
+        # durability="exit": save memory once, when the turn ends, instead of after every node —
+        # one write to Postgres per question instead of four
+        final_output = rag_agent.invoke(initial_state, config=config, durability="exit")
         documents = final_output.get("documents", [])
 
         return {
