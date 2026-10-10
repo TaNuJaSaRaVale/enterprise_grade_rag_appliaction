@@ -122,6 +122,7 @@ def run_single(golden: dict, run_id: str) -> dict:
         "guard_fired": False,
         "intent": None,
         "search_query": None,
+        "sub_queries": [],
         "answer": None,
         "retrieved_contexts": [],
         "retrieved_sources": [],
@@ -158,6 +159,7 @@ def run_single(golden: dict, run_id: str) -> dict:
         record.update(
             intent="conversational" if conversational else "technical",
             search_query=None if conversational else final.get("current_query"),
+            sub_queries=[] if conversational else (final.get("sub_queries") or []),
             answer=final.get("final_answer"),
             retrieved_contexts=[text for _, text in split_docs],
             retrieved_sources=sources,
@@ -316,6 +318,7 @@ def main():
             "golden_file": str(args.goldens.name),
             "golden_count": len(goldens),
             "limit": args.limit,
+            "qdrant_collection": settings.QDRANT_COLLECTION,
             "models": {"llm": settings.GROQ_MODEL, "fast_llm": settings.GROQ_FAST_MODEL,
                        "reranker": RERANK_MODEL, "min_rerank_score": MIN_RERANK_SCORE},
         }

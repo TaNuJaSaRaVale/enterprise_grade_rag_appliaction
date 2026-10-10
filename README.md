@@ -27,6 +27,8 @@ Thresholds are calibrated on this corpus: passages that answered golden question
 
 **2. Quality is measured.** A golden dataset + LLM-as-judge pipeline (Ragas) scores retrieval and generation separately — see [Evaluation](#evaluation) for the numbers and what they revealed.
 
+**3. It splits multi-part questions.** "How does X stop, and what is suggested instead for Y?" is two questions whose answers sit in different parts of a document. The planner cuts such a question into its parts, and each part is searched and reranked on its own — in the same LLM call the planner already makes, so it costs no extra LLM call. See [Query decomposition](#query-decomposition-multi-part-questions).
+
 ---
 
 ## Architecture
@@ -38,10 +40,10 @@ flowchart LR
     API --> RL{Rate limit + input limits}
     RL --> G[NeMo Guardrails<br/>embedding-based intents]
     G -- off-topic / jailbreak / greeting --> UI
-    G -- technical --> P[Planner<br/>structured output, query rewrite]
+    G -- technical --> P[Planner<br/>structured output, query rewrite,<br/>multi-part split]
     P -- off-topic --> UI
     P -- conversational --> R[Responder]
-    P -- technical --> RET[Retriever<br/>Qdrant vector search → FlashRank rerank]
+    P -- technical --> RET[Retriever<br/>per sub-query: Qdrant search → FlashRank rerank,<br/>then merge]
     RET --> R
     R --> PK[Portkey gateway<br/>fallback + retry + cache]
     PK --> GROQ[Groq: gpt-oss-120b → gpt-oss-20b]
@@ -51,7 +53,8 @@ flowchart LR
 |---|---|---|
 | Orchestration | LangGraph (planner → retriever → responder) with per-thread memory | Explicit, inspectable agent flow |
 | Guardrails | Layer 1: NeMo Guardrails, `embeddings_only` intent matching · Layer 2: planner LLM `off_topic` intent | Layer 1 is free and instant for common cases; layer 2 generalises to any topic at no extra LLM call (the planner already runs) |
-| Retrieval | Gemini embeddings → Qdrant Cloud → FlashRank `ms-marco-MiniLM-L-12-v2`, min-score cutoff | Cross-encoder reranking removes irrelevant chunks before they reach the LLM |
+| Ingestion | Size-bounded chunker (1,200 characters, 200 overlap), per-file report, post-ingest count check in Qdrant | The reranker only reads about 512 tokens, so a chunk must be small enough to be judged as a whole |
+| Retrieval | Gemini embeddings → Qdrant Cloud → FlashRank `ms-marco-MiniLM-L-12-v2`, min-score cutoff; multi-part questions are searched once per part | Cross-encoder reranking removes irrelevant chunks before they reach the LLM |
 | Generation | Grounded prompt with `[n]` citations; explicit "not in the docs" path | Reduces hallucination |
 | Gateway | Portkey: primary/fallback models, retries, caching | Resilience on free-tier rate limits |
 | Observability | Pydantic Logfire spans across UI → API → agent | End-to-end traces |
@@ -96,6 +99,52 @@ Run `20260927-112048` · judge `openai/gpt-oss-20b` · all 17 in-scope goldens s
 **Why `n` differs:** a metric that does not apply is marked N/A and left out of the average — never counted as 0. Faithfulness has n=15 because two questions retrieved nothing, and an answer cannot be faithful or unfaithful to no context (their Context Recall/Precision *are* counted, as a measured 0).
 
 **Rate limits:** scoring takes ~15k judge tokens per golden, and Groq's free tier allows 200k per day. The run hit the daily limit after 13 goldens; because results are written per golden and the scorer resumes, the remaining ones were scored the next day against the same answers, the same judge and the same code — so all 17 are comparable.
+
+### After the retrieval fixes
+
+Two fixes followed from the baseline: a size-bounded chunker with a full re-ingest into a second collection (`enterprise_rag_v2`), and query decomposition for multi-part questions.
+
+| Metric | Baseline `20260927-112048` | New chunker `20261003-211038` | + query decomposition `20261009-143328` |
+|---|---|---|---|
+| Source hit rate | 0.71 (12/17) | 0.94 (16/17) | **1.00 (17/17)** |
+| Context Recall | 0.69 | 0.94 | **1.00** |
+| Context Precision | 0.74 | 0.83 | 0.80 |
+| Faithfulness | 0.78 (n=15) | 0.92 (n=16) | 0.89 (n=17) |
+| Answer Relevancy | 0.73 | 0.79 | 0.76 |
+| Honest refusal (out-of-scope) | 3/3 | 3/3 | 3/3 |
+
+Same 20 goldens, same corpus, same judge (`openai/gpt-oss-20b`) in every column. All 17 in-scope questions are scored in every column, with 0 judge errors.
+
+What the last step did and did not do:
+
+- **It fixed retrieval.** Context Recall is 1.00: for every question, the retrieved passages now contain the facts needed for the correct answer.
+- **It is not a gain on every metric.** Context Precision and Answer Relevancy are slightly lower (0.83 → 0.80 and 0.79 → 0.76). Sub-queries bring in extra passages, and some rank above more useful ones (`mon-001` precision 1.0 → 0.64).
+- **Faithfulness is unchanged where it can be compared** (0.92 → 0.93 on the 16 questions scored in both runs). The headline number drops to 0.89 only because the fixed question `pwq-002` is now counted: it had no context before (N/A), and now scores 0.25, because the answer added Redis command details and a YAML example that are not in the retrieved text. Retrieval for it is right; the answer writer over-explains.
+- **Some movement is noise.** `hpa-003` precision (0.75 → 0.25) and `hpa-001` relevancy (0.63 → 0.29) fell although neither question was split, and `arch-002` faithfulness rose 0.5 → 1.0 with no related change. With 17 questions and LLM-written queries and answers, single-question swings like these happen between runs.
+
+**Which data the live demo uses:** the numbers above were measured locally against `enterprise_rag_v2`. The public demo reads the older `enterprise_rag` collection until its `QDRANT_COLLECTION` secret is switched; the switch is one setting and rolling back is deleting it.
+
+### Query decomposition (multi-part questions)
+
+After the re-ingest, one question got worse. `pwq-002` asks two things about the Redis work-queue example: how a worker knows when to stop, and what to use instead for a continuous stream of work. With small chunks the two answers sit in two different chunks. The combined question scored below the 0.1 cutoff against **each** of them (top score 0.04), so nothing was retrieved.
+
+The fix has three small parts:
+
+1. **Planner** — the same LLM call now also returns `sub_queries`: one question per part, for questions that ask about two or three distinct things.
+2. **Retriever** — every query (the main one plus each sub-query) is searched and reranked on its own. The results are merged so that each part's best chunk gets a slot.
+3. **Eval** — the pipeline records the planner's `search_query` and `sub_queries` for every golden, so a miss can be traced to the query that caused it.
+
+It took three versions of the planner prompt to get right, and the eval showed why each earlier one failed:
+
+| Prompt version | What the planner wrote for the second part | Reranker score on the correct chunk | `pwq-002` result |
+|---|---|---|---|
+| 1. "one query per part" | keywords: "continuous background work pattern alternative to Redis work queue" | 0.008 | half answered |
+| 2. "short self-contained questions" | "What is the recommended approach for a continuous stream of background work in Redis?" | 0.011 | worse — 1 chunk |
+| 3. "copy the user's words" | "What is suggested instead for a continuous stream of background work?" | 0.61 | both parts answered, 3 chunks |
+
+The lesson: the cross-encoder is very sensitive to wording. "Suggested instead" and "recommended approach" mean the same to a person, but score 0.61 and 0.011. So the planner must **cut** the user's sentence, not **rewrite** it. Version 3 also stopped needless splitting: 7 of 17 in-scope questions are split, down from 10.
+
+Honest caveats: this was tuned while looking at one golden, and the planner is an LLM, so it can still reword a sub-query now and then. The other 16 in-scope goldens kept their source hit. More multi-part goldens are the next check.
 
 ### Out-of-scope questions: honest refusal
 
@@ -142,6 +191,8 @@ Honest caveats: the planner's off-topic categories (shopping, finance, translati
 - **A document that was never indexed.** All three CronJob questions missed their source: ingestion had silently dropped `cronjobs.docx` (errors were only logged). Found by the first eval run, not by manual testing.
 - **Whole documents stored as single chunks.** VPA questions returned "not in docs" although the answer exists: the article was one 17.7k-character chunk and the cross-encoder only reads the first ~512 tokens, where only HPA content is. The same file answered HPA questions correctly.
 - **Judge choice changes scores.** The same answer scored Faithfulness 0.68 with a Qwen judge and 1.0 with gpt-oss-20b — so runs are only compared under the same judge, and verdicts are spot-checked.
+- **A fix can break something else.** Smaller chunks fixed the VPA questions but broke a two-part question, because each small chunk now answered only half of it. Only the re-run of the full golden set showed this.
+- **An LLM rewording a query can hide the right passage.** The planner's paraphrase of a sub-question scored 0.011 on the correct chunk; the user's own words scored 0.61. See [Query decomposition](#query-decomposition-multi-part-questions).
 - **The judge can be lenient.** A spot-check of `hpa-003` (HPA vs VPA) found Faithfulness 1.0 although the answer included details ("stateless", "batch jobs") that were not in the trimmed context the LLM saw. Its Context Recall of 0.0 is accurate — it is the oversized-chunk problem again: the VPA part of the 17.7k-character chunk is trimmed away before the LLM sees it.
 
 ---
@@ -189,9 +240,12 @@ Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKE
 
 ## Known limitations & roadmap
 
-- **Chunking:** PDFs/HTML without paragraph breaks become single oversized chunks → add a size-bounded splitter with overlap and re-ingest (the eval pipeline is in place to measure the gain).
-- **Confidence is wording-sensitive** until chunking is fixed: the reranker only reads the start of oversized chunks, so rephrasing can move the same correct answer from Low (0.24) to High (0.86). The badge errs toward under-confidence, not over-confidence.
-- **Ingestion reliability:** failures are logged, not surfaced → add a per-file ingestion report and a post-ingest verification of chunk counts in Qdrant.
+- **Done — chunking:** documents without paragraph breaks used to become single oversized chunks. A size-bounded splitter with overlap and a full re-ingest fixed this (measured above).
+- **Done — ingestion reliability:** failures used to be only logged. The job now prints a per-file report and checks the chunk counts in Qdrant afterwards.
+- **The reranker is wording-sensitive.** A fixed 0.1 cutoff can drop a correct chunk when a question is phrased unusually. The system then says "not in the docs" instead of guessing, so the error is on the safe side → try a stronger reranker or a relative cutoff, and measure both.
+- **Query decomposition is tested on few questions** → add more multi-part goldens whose answers sit in different chunks.
+- **Answers sometimes add details that are not in the retrieved text** (unsupported specifics on `pwq-002`, an extra "General guidance" block on `arch-002` in one run); the judge counts them as unsupported → tighten the responder prompt.
+- **Scores vary between runs.** Each configuration was run once on 17 questions → repeat runs to report a range, and add more goldens.
 - **Memory** is in-process (`MemorySaver`) → move to a persistent checkpointer (Postgres).
 - **Judge bias:** the judge shares a model family with the answer model → spot-check verdicts; move to a cross-family judge when limits allow.
 - **Guardrails:** two layers now (embeddings + planner LLM), but the planner is evaluated on a small set that influenced its prompt → evaluate on a fresh, larger unseen set; add a dedicated prompt-injection classifier for injections hidden inside long technical questions.

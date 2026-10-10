@@ -4,6 +4,7 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from app.config import settings
 
 BATCH_SIZE = 50
+RATE_LIMIT_WAITS_S = (10, 20, 40, 60, 60)  # 6 attempts, ~3 min total
 _GEMINI_DIM = 3072
 _FALLBACK_DIM = 768  # all-mpnet-base-v2
 
@@ -61,24 +62,28 @@ def get_embedding_dim() -> int:
 
 def _embed_batch(batch: list[str]) -> list[list[float]]:
     if _model_type == "gemini":
-        # Exponential backoff: 1 s → 2 s → 4 s → 8 s (4 attempts total)
-        for attempt in range(4):
+        # Free-tier limits reset per MINUTE, so waits must add up to more than a minute —
+        # the old 1+2+4s backoff failed all retries inside the same window and lost whole files.
+        # Only ingestion calls this, so long waits never block a user's query.
+        waits = RATE_LIMIT_WAITS_S
+        for attempt in range(len(waits) + 1):
             try:
                 return _active_model.embed_documents(batch)
             except Exception as e:
                 err = str(e).lower()
-                is_rate_limit = any(x in err for x in ("429", "rate", "quota", "resource_exhausted"))
-                if is_rate_limit and attempt < 3:
-                    wait = 2 ** attempt
+                # 429 = our quota; 503 = Google overloaded (common on the free-tier preview model).
+                # Both clear on their own, so both are retried.
+                is_transient = any(x in err for x in ("429", "rate", "quota", "resource_exhausted",
+                                                      "503", "unavailable", "overloaded"))
+                if is_transient and attempt < len(waits):
                     logfire.warning(
-                        f"Gemini rate limit hit — retrying in {wait}s "
-                        f"(attempt {attempt + 1}/4)."
+                        f"Gemini rate-limited or temporarily unavailable — retrying in {waits[attempt]}s "
+                        f"(attempt {attempt + 1}/{len(waits) + 1})."
                     )
-                    time.sleep(wait)
+                    time.sleep(waits[attempt])
                 else:
                     logfire.error(f"Gemini embedding failed: {e}")
                     raise
-        raise RuntimeError("Gemini rate limit persisted after 4 attempts.")
     else:
         return _active_model.encode(batch, show_progress_bar=False).tolist()
 

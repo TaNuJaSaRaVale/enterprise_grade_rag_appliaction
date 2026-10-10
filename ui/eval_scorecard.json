@@ -1,26 +1,26 @@
 {
-  "run_id": "20260927-112048",
+  "run_id": "20261009-143328",
   "judge_model": "openai/gpt-oss-20b",
   "goldens_total": 20,
-  "goldens_scored": 13,
-  "source_hit_rate": 0.706,
-  "avg_latency_s": 8.64,
+  "goldens_scored": 20,
+  "source_hit_rate": 1.0,
+  "avg_latency_s": 13.39,
   "metrics": {
     "context_recall": {
-      "mean": 0.596,
-      "n": 13
+      "mean": 1.0,
+      "n": 17
     },
     "context_precision": {
-      "mean": 0.674,
-      "n": 13
+      "mean": 0.799,
+      "n": 17
     },
     "faithfulness": {
-      "mean": 0.745,
-      "n": 11
+      "mean": 0.887,
+      "n": 17
     },
     "answer_relevancy": {
-      "mean": 0.706,
-      "n": 13
+      "mean": 0.761,
+      "n": 17
     }
   }
 }

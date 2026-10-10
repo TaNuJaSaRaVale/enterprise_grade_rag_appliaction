@@ -1,0 +1,39 @@
+{
+  "run_id": "20261009-143328",
+  "started_at": "2026-10-09T09:03:28.657688+00:00",
+  "git_commit": "bada41f",
+  "git_dirty": true,
+  "dirty_files": [
+    "app/agents/nodes/planner.py",
+    "app/agents/nodes/retriever.py",
+    "app/agents/state.py",
+    "app/config.py",
+    "app/ingestion/chunking/splitter.py",
+    "app/ingestion/processor.py",
+    "app/services/retrieval/embedding.py",
+    "evals/pipeline.py",
+    "app/README.md",
+    "app/agents/README.md",
+    "app/gateway/README.md",
+    "app/guardrails/README.md",
+    "app/ingestion/README.md",
+    "app/services/retrieval/README.md",
+    "evals/README.md",
+    "evals/results/20261003-210709/",
+    "evals/results/20261003-211038/",
+    "evals/results/20261008-164819/",
+    "evals/results/20261008-165107/",
+    "evals/results/20261009-141503/",
+    "ui/README.md"
+  ],
+  "golden_file": "golden_dataset.json",
+  "golden_count": 20,
+  "limit": null,
+  "qdrant_collection": "enterprise_rag_v2",
+  "models": {
+    "llm": "openai/gpt-oss-120b",
+    "fast_llm": "openai/gpt-oss-20b",
+    "reranker": "ms-marco-MiniLM-L-12-v2",
+    "min_rerank_score": 0.1
+  }
+}

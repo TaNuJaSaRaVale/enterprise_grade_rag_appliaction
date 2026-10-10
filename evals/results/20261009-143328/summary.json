@@ -1,0 +1,11 @@
+{
+  "total": 20,
+  "completed": 20,
+  "errors": 0,
+  "error_ids": [],
+  "guard_blocked_ids": [],
+  "source_hit_rate": 1.0,
+  "source_miss_ids": [],
+  "avg_latency_s": 13.39,
+  "cache_hits": 0
+}

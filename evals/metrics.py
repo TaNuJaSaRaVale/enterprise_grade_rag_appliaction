@@ -1,5 +1,5 @@
 """
-Scores a pipeline run with Ragas, using the Qwen judge (evals/judge.py).
+Scores a pipeline run with Ragas, using the LLM judge (evals/judge.py).
 
 Reads   evals/results/<run_id>/pipeline_results.jsonl   (from evals/pipeline.py)
 Writes  evals/results/<run_id>/metrics_results.jsonl    (one line per golden, append + resume)
@@ -172,7 +172,7 @@ async def score_run(run_id: str, limit: int | None = None, ids: set | None = Non
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Score a pipeline run with Ragas (Qwen judge).")
+    parser = argparse.ArgumentParser(description="Score a pipeline run with Ragas (LLM judge).")
     parser.add_argument("--run", required=True, metavar="RUN_ID", help="folder name under evals/results/")
     parser.add_argument("--limit", type=int, help="only score the first N goldens")
     parser.add_argument("--ids", help="comma-separated golden ids to score (testing)")

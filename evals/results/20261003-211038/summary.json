@@ -1,0 +1,13 @@
+{
+  "total": 20,
+  "completed": 20,
+  "errors": 0,
+  "error_ids": [],
+  "guard_blocked_ids": [],
+  "source_hit_rate": 0.941,
+  "source_miss_ids": [
+    "pwq-002"
+  ],
+  "avg_latency_s": 7.46,
+  "cache_hits": 0
+}

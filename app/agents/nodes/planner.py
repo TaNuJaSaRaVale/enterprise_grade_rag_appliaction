@@ -13,6 +13,9 @@ llm = get_langchain_llm(feature="planner")
 MAX_HISTORY_MESSAGES = 6
 MAX_HISTORY_CHARS_PER_MESSAGE = 500
 
+# Multi-part questions are split so each part is retrieved and reranked on its own
+MAX_SUB_QUERIES = 3
+
 
 class PlannerDecision(BaseModel):
     """Structured planner output. JSON schema output replaces free text, which
@@ -26,6 +29,11 @@ class PlannerDecision(BaseModel):
     search_query: str = Field(
         default="",
         description="For 'technical': a standalone, keyword-rich search query. Empty otherwise."
+    )
+    sub_queries: list[str] = Field(
+        default_factory=list,
+        description="For 'technical' questions that ask about 2-3 distinct things: one standalone "
+                    "search query per part. Empty for single-topic questions."
     )
 
 
@@ -79,6 +87,20 @@ For "technical", write search_query as a single standalone search query:
   "configure SR-IOV virtual functions on Intel NICs").
 - Keep the key technical terms, product names, and commands from the user's message.
 - One line, no explanations, no quotes, 5-15 words.
+
+If the message asks about two or three DISTINCT things that different sections of the
+docs would answer, also fill sub_queries with one question per part (max {MAX_SUB_QUERIES}).
+- Build each sub-query by COPYING the user's words for that part. Do not reword them or
+  swap in synonyms.
+- Only add the shared subject a part needs to stand alone, copied from the message.
+- Do not add terms that belong to the other parts.
+Example: "In the nightly backup Job, how are failed pods retried, and what is suggested
+instead for long-running services?" ->
+  "In the nightly backup Job, how are failed pods retried?"
+  "What is suggested instead for long-running services in the nightly backup Job?"
+Leave sub_queries empty when the parts are about the same thing, e.g. "What options does
+X have and what does each do?" or "When should I use X vs Y?".
+Always fill search_query, even when sub_queries is filled.
 """
     return planner_llm.invoke(prompt)
 
@@ -101,7 +123,9 @@ def planner_node(state: AgentState):
             decision = PlannerDecision(intent="technical", search_query=user_message)
 
         search_query = decision.search_query.strip() or user_message
-        logfire.info(f"Intent identified: {decision.intent} | query: {search_query}")
+        sub_queries = [q.strip() for q in decision.sub_queries if q.strip()][:MAX_SUB_QUERIES]
+        logfire.info(f"Intent identified: {decision.intent} | query: {search_query} | "
+                     f"sub-queries: {sub_queries}")
 
     if decision.intent == "off_topic":
         # Fixed reply, graph ends here — no retrieval and no responder LLM call
@@ -120,8 +144,13 @@ def planner_node(state: AgentState):
             "plan": ["Intent: Conversational/Memory", "Retrieval: Skipped"]
         }
 
+    plan = ["Intent: Technical", f"Search Term: {search_query}"]
+    if sub_queries:
+        plan.append("Sub-queries: " + " | ".join(sub_queries))
+
     return {
         "current_query": search_query,
+        "sub_queries": sub_queries,
         "status": f"Technical research needed. Searching for: {search_query}",
-        "plan": ["Intent: Technical", f"Search Term: {search_query}"]
+        "plan": plan
     }

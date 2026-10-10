@@ -11,7 +11,8 @@ class Settings:
     # --- VECTOR DB (QDRANT) ---
     QDRANT_URL = os.getenv("QDRANT_CLUSTER_ENDPOINT")
     QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
-    QDRANT_COLLECTION = "enterprise_rag"
+    # Overridable so a re-ingest can build a new collection while the live demo keeps the old one
+    QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "enterprise_rag")
 
     # --- REASONING ENGINE (GROQ) ---
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")

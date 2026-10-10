@@ -1,0 +1,118 @@
+{
+  "goldens": 20,
+  "metrics": {
+    "context_recall": {
+      "mean": 1.0,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "arch-001",
+          "score": 1.0
+        },
+        {
+          "id": "arch-002",
+          "score": 1.0
+        },
+        {
+          "id": "arch-003",
+          "score": 1.0
+        }
+      ]
+    },
+    "context_precision": {
+      "mean": 0.799,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "hpa-003",
+          "score": 0.25
+        },
+        {
+          "id": "arch-003",
+          "score": 0.4167
+        },
+        {
+          "id": "pwq-002",
+          "score": 0.5
+        }
+      ]
+    },
+    "faithfulness": {
+      "mean": 0.887,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "pwq-002",
+          "score": 0.25
+        },
+        {
+          "id": "cron-003",
+          "score": 0.5
+        },
+        {
+          "id": "hpa-003",
+          "score": 0.75
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "mean": 0.761,
+      "n": 17,
+      "n_not_applicable": 3,
+      "n_errors": 0,
+      "lowest": [
+        {
+          "id": "hpa-001",
+          "score": 0.2851
+        },
+        {
+          "id": "pwq-001",
+          "score": 0.4934
+        },
+        {
+          "id": "hpa-002",
+          "score": 0.5318
+        }
+      ]
+    }
+  },
+  "by_type": {
+    "comparison": {
+      "context_recall": 1.0,
+      "context_precision": 0.25,
+      "faithfulness": 0.75,
+      "answer_relevancy": 0.756
+    },
+    "multi_part": {
+      "context_recall": 1.0,
+      "context_precision": 0.772,
+      "faithfulness": 0.791,
+      "answer_relevancy": 0.723
+    },
+    "out_of_scope": {
+      "context_recall": null,
+      "context_precision": null,
+      "faithfulness": null,
+      "answer_relevancy": null
+    },
+    "reasoning": {
+      "context_recall": 1.0,
+      "context_precision": 0.708,
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.839
+    },
+    "simple_fact": {
+      "context_recall": 1.0,
+      "context_precision": 0.958,
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.786
+    }
+  },
+  "goldens_with_errors": []
+}
