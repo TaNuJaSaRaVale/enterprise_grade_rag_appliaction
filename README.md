@@ -249,6 +249,7 @@ Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKE
 - **Scores vary between runs.** Each configuration was run once on 17 questions → repeat runs to report a range, and add more goldens.
 - **Done — persistent memory:** conversation memory moved from in-process to a Postgres checkpointer (Neon free tier), with a fallback to in-process memory if the database is unreachable.
 - **Memory housekeeping:** old conversation threads are never deleted → add a scheduled clean-up of threads older than a few days.
+- **Follow-up questions are tested on a handful of examples only** → add multi-turn goldens (a question plus a follow-up that needs the history) to the eval set.
 - **"What did I just ask?" is caught by the layer-1 guardrail** and gets the capabilities reply instead of an answer from memory → add it as a passing example in the rails.
 - **Judge bias:** the judge shares a model family with the answer model → spot-check verdicts; move to a cross-family judge when limits allow.
 - **Guardrails:** two layers now (embeddings + planner LLM), but the planner is evaluated on a small set that influenced its prompt → evaluate on a fresh, larger unseen set; add a dedicated prompt-injection classifier for injections hidden inside long technical questions.

@@ -1,3 +1,4 @@
+import re
 import logfire
 from app.agents.state import AgentState
 from app.gateway import portkey_client, extract_cache_status
@@ -42,6 +43,15 @@ CONVERSATIONAL_SYSTEM_PROMPT = """You are a friendly, professional Enterprise IT
 Kubernetes, Intel hardware, and enterprise networking. Reply to the user's latest message using the
 conversation history. Keep it short and natural. Do not make up technical facts — if the user asks
 something technical, invite them to ask it directly so you can search the documentation."""
+
+
+# gpt-oss often writes citations in its own style — 【3】 or 【3†L1-L4】 — even when told to use [3]
+_FULLWIDTH_CITATION = re.compile(r"【\s*(\d+)[^】]*】")
+
+
+def normalize_citations(text: str) -> str:
+    """Rewrite 【n】-style citations as [n], the form the UI and evals/refusal.py expect."""
+    return _FULLWIDTH_CITATION.sub(r"[\1]", text)
 
 
 def _format_history(messages: list[dict]) -> str:
@@ -116,7 +126,7 @@ def generate_node(state: AgentState):
                 ],
                 temperature=0.1
             )
-            content = response.choices[0].message.content
+            content = normalize_citations(response.choices[0].message.content)
             cache_status = extract_cache_status(response)
             is_cache_hit = cache_status == "HIT"
 
