@@ -4,7 +4,7 @@ An agentic Retrieval-Augmented Generation assistant for enterprise IT documentat
 
 **Live demo:** https://agentic-rag-d.streamlit.app
 
-**Try:** "In the nginx HPA example, what replica range is used?" · "What roles do etcd and kube-apiserver play?" · "How do I set up Istio mTLS?" (not in docs) · "tell me a joke" (guardrail)
+**Try:** "In the nginx HPA example, what replica range is used?" · "What roles do etcd and kube-apiserver play?" · "In the Redis work-queue Job, how does each worker know when to stop, and what is suggested instead for a continuous stream of background work?" (multi-part) · "How do I set up Istio mTLS?" (not in docs) · "tell me a joke" (guardrail)
 
 > The demo sleeps when idle — the first question after a wake-up can take about a minute while models load.
 
@@ -122,7 +122,7 @@ What the last step did and did not do:
 - **Faithfulness is unchanged where it can be compared** (0.92 → 0.93 on the 16 questions scored in both runs). The headline number drops to 0.89 only because the fixed question `pwq-002` is now counted: it had no context before (N/A), and now scores 0.25, because the answer added Redis command details and a YAML example that are not in the retrieved text. Retrieval for it is right; the answer writer over-explains.
 - **Some movement is noise.** `hpa-003` precision (0.75 → 0.25) and `hpa-001` relevancy (0.63 → 0.29) fell although neither question was split, and `arch-002` faithfulness rose 0.5 → 1.0 with no related change. With 17 questions and LLM-written queries and answers, single-question swings like these happen between runs.
 
-**Which data the live demo uses:** the numbers above were measured locally against `enterprise_rag_v2`. The public demo reads the older `enterprise_rag` collection until its `QDRANT_COLLECTION` secret is switched; the switch is one setting and rolling back is deleting it.
+**Which data the live demo uses:** the numbers above were measured locally against `enterprise_rag_v2`. The public demo was switched to that collection on 2026-10-10 with one setting (`QDRANT_COLLECTION`), with no downtime: the old collection kept serving while the new one was built and evaluated. Rolling back is deleting the setting.
 
 ### Query decomposition (multi-part questions)
 

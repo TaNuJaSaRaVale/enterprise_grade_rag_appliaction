@@ -60,7 +60,7 @@ streamlit run ui/app.py        # with BACKEND_URL unset
 - **Live demo:** https://agentic-rag-d.streamlit.app (Streamlit Community Cloud, in-process mode). It sleeps when idle; the first question after a wake-up can take about a minute while models load.
 - **Secrets** are set in the Streamlit Cloud dashboard, not in the repo. The backend reads them as environment variables.
 - **`requirements.txt` here must stay in sync with `../requirements-app.txt`.** Streamlit Cloud reads the file next to the app before the root one. It leaves out the eval libraries, the ingestion parsers and torch/sentence-transformers.
-- **Switching the demo to the re-ingested collection** is one secret: `QDRANT_COLLECTION=enterprise_rag_v2`. Deleting the secret rolls back to `enterprise_rag`.
+- **The demo reads the re-ingested collection** since 2026-10-10, through one secret: `QDRANT_COLLECTION = "enterprise_rag_v2"`. Deleting the secret rolls back to `enterprise_rag`, which is kept for now as the rollback.
 
 ## What changed while building this, and why
 
