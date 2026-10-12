@@ -103,25 +103,31 @@ Run `20260927-112048` · judge `openai/gpt-oss-20b` · all 17 in-scope goldens s
 
 ### After the retrieval fixes
 
-Two fixes followed from the baseline: a size-bounded chunker with a full re-ingest into a second collection (`enterprise_rag_v2`), and query decomposition for multi-part questions.
+Three fixes followed from the baseline: a size-bounded chunker with a full re-ingest into a second collection (`enterprise_rag_v2`), query decomposition for multi-part questions, and a stricter answer prompt.
 
-| Metric | Baseline `20260927-112048` | New chunker `20261003-211038` | + query decomposition `20261009-143328` |
-|---|---|---|---|
-| Source hit rate | 0.71 (12/17) | 0.94 (16/17) | **1.00 (17/17)** |
-| Context Recall | 0.69 | 0.94 | **1.00** |
-| Context Precision | 0.74 | 0.83 | 0.80 |
-| Faithfulness | 0.78 (n=15) | 0.92 (n=16) | 0.89 (n=17) |
-| Answer Relevancy | 0.73 | 0.79 | 0.76 |
-| Honest refusal (out-of-scope) | 3/3 | 3/3 | 3/3 |
+| Metric | Baseline `20260927-112048` | New chunker `20261003-211038` | + query decomposition `20261009-143328` | + stricter answer prompt `20261010-175028` |
+|---|---|---|---|---|
+| Source hit rate | 0.71 (12/17) | 0.94 (16/17) | **1.00 (17/17)** | **1.00 (17/17)** |
+| Context Recall | 0.69 | 0.94 | **1.00** | **1.00** |
+| Context Precision | 0.74 | 0.83 | 0.80 | **0.84** |
+| Faithfulness | 0.78 (n=15) | 0.92 (n=16) | 0.89 (n=17) | **0.99** (n=17) |
+| Answer Relevancy | 0.73 | 0.79 | 0.76 | 0.79 |
+| Honest refusal (out-of-scope) | 3/3 | 3/3 | 3/3 | 3/3 |
 
 Same 20 goldens, same corpus, same judge (`openai/gpt-oss-20b`) in every column. All 17 in-scope questions are scored in every column, with 0 judge errors.
 
-What the last step did and did not do:
+What query decomposition (third column) did and did not do:
 
 - **It fixed retrieval.** Context Recall is 1.00: for every question, the retrieved passages now contain the facts needed for the correct answer.
 - **It is not a gain on every metric.** Context Precision and Answer Relevancy are slightly lower (0.83 → 0.80 and 0.79 → 0.76). Sub-queries bring in extra passages, and some rank above more useful ones (`mon-001` precision 1.0 → 0.64).
 - **Faithfulness is unchanged where it can be compared** (0.92 → 0.93 on the 16 questions scored in both runs). The headline number drops to 0.89 only because the fixed question `pwq-002` is now counted: it had no context before (N/A), and now scores 0.25, because the answer added Redis command details and a YAML example that are not in the retrieved text. Retrieval for it is right; the answer writer over-explains.
 - **Some movement is noise.** `hpa-003` precision (0.75 → 0.25) and `hpa-001` relevancy (0.63 → 0.29) fell although neither question was split, and `arch-002` faithfulness rose 0.5 → 1.0 with no related change. With 17 questions and LLM-written queries and answers, single-question swings like these happen between runs.
+
+What the stricter answer prompt (fourth column) did:
+
+- **It fixed the answer-writing problem.** The prompt now says: state only what the excerpts say, copy code instead of writing it, and add general guidance only when the docs do not fully answer. Faithfulness rose from 0.89 to 0.99. `pwq-002` went from 0.25 to 1.0, and 16 of 17 answers are now fully supported by the retrieved text (the exception is `pwq-001` at 0.83).
+- **Answers are shorter and stay in the docs.** In-scope answers with a "General guidance" block fell from 7 to 0, and the median answer length from 150 to 78 words.
+- **Retrieval did not change, so its movement is noise.** The retrieval code and the collection are the same in the last two columns, and Context Recall is 1.00 in both. Context Precision still moved 0.80 → 0.84, almost all of it from `hpa-003` (0.25 → 0.92) and `dbx-001` (0.70 → 1.0). Read the Answer Relevancy change (0.76 → 0.79) the same way: within run-to-run variation.
 
 **Which data the live demo uses:** the numbers above were measured locally against `enterprise_rag_v2`. The public demo was switched to that collection on 2026-10-10 with one setting (`QDRANT_COLLECTION`), with no downtime: the old collection kept serving while the new one was built and evaluated. Rolling back is deleting the setting.
 

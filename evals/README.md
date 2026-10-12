@@ -116,18 +116,18 @@ It reports `block_rate` and `false_block_rate` for layer 1, layer 2 and the comb
 
 ## Results so far
 
-| Metric | Baseline `20260927-112048` | v2 `20261003-211038` | v2 + decomposition `20261009-143328` |
-|---|---|---|---|
-| Source hit rate | 0.706 (12/17) | 0.941 (16/17) | 1.0 (17/17) |
-| Context recall | 0.691 | 0.941 | 1.0 |
-| Context precision | 0.736 | 0.828 | 0.799 |
-| Faithfulness | 0.780 (n=15) | 0.924 (n=16) | 0.887 (n=17) |
-| Answer relevancy | 0.734 | 0.789 | 0.761 |
-| Honest refusal | 3/3 | 3/3 | 3/3 |
+| Metric | Baseline `20260927-112048` | v2 `20261003-211038` | v2 + decomposition `20261009-143328` | + stricter answer prompt `20261010-175028` |
+|---|---|---|---|---|
+| Source hit rate | 0.706 (12/17) | 0.941 (16/17) | 1.0 (17/17) | 1.0 (17/17) |
+| Context recall | 0.691 | 0.941 | 1.0 | 1.0 |
+| Context precision | 0.736 | 0.828 | 0.799 | 0.842 |
+| Faithfulness | 0.780 (n=15) | 0.924 (n=16) | 0.887 (n=17) | 0.990 (n=17) |
+| Answer relevancy | 0.734 | 0.789 | 0.761 | 0.786 |
+| Honest refusal | 3/3 | 3/3 | 3/3 | 3/3 |
 
-Same goldens and same judge in every column. All three runs have all 17 in-scope goldens scored with 0 judge errors. (The third was scored over two days, 12 + 5, because of the daily judge limit.)
+Same goldens and same judge in every column. All four runs have all 17 in-scope goldens scored with 0 judge errors. (The third was scored over two days, 12 + 5, and the fourth over two sessions, 8 + 9, because of the daily judge limit.)
 
-Reading the last two columns honestly:
+Reading the second and third columns (v2 → v2 + decomposition) honestly:
 
 | Metric | Change | What is behind it |
 |---|---|---|
@@ -152,7 +152,7 @@ So decomposition did what it was built for (recall), cost a little precision, an
 
 The number of in-scope goldens that were split fell from 10 of 17 (v2 prompt) to 7 of 17 (v3 prompt). The v3 prompt tells the planner not to split questions whose parts are about the same thing.
 
-### Run `20261010-175028` — tightened answer prompt (judge scoring in progress)
+### Run `20261010-175028` — tightened answer prompt
 
 Same collection and retrieval code as `20261009-143328`; the only change is the responder's prompt (answers must come from the excerpts, no general guidance when the docs fully answer).
 
@@ -163,7 +163,16 @@ Same collection and retrieval code as `20261009-143328`; the only change is the 
 | In-scope answers with a "General guidance" block | 7 | 0 |
 | Median in-scope answer length | 150 words | 78 words |
 
-The four judge metrics for this run are being scored over two days (daily judge limit) and will be added as a fourth column above. Until then, the effect on faithfulness is expected but **not yet measured**.
+The judge metrics, against `20261009-143328` (all 17 in-scope goldens scored in both):
+
+| Metric | Change | What is behind it |
+|---|---|---|
+| Context recall | 1.0 → 1.0 | No golden moved. Retrieval code is unchanged. |
+| Context precision | 0.799 → 0.842 | `hpa-003` 0.25 → 0.92 and `dbx-001` 0.7 → 1.0 up; `mon-002` 1.0 → 0.83 and `cron-003` 0.83 → 0.76 down. Retrieval did not change, so this is run-to-run variation, not an improvement. |
+| Faithfulness | 0.887 → 0.990 | This is the fix. `pwq-002` 0.25 → 1.0, `cron-003` 0.5 → 1.0, `hpa-003` 0.75 → 1.0, `hpa-001` 0.77 → 1.0, `cron-002` 0.81 → 1.0. One golden fell: `pwq-001` 1.0 → 0.83. 16 of 17 answers now score 1.0. |
+| Answer relevancy | 0.761 → 0.786 | Mixed: `arch-001` 0.69 → 0.92, `hpa-003` 0.76 → 0.99, `dbx-002` 0.80 → 0.98 up; `vpa-002` 0.87 → 0.65 down. Within noise. |
+
+So the stricter prompt did what it was built for (faithfulness) without a measurable cost on the other metrics. It was run once, like every other configuration here.
 
 Things to know before quoting these:
 
@@ -171,7 +180,7 @@ Things to know before quoting these:
 - The worker-loop code chunk of that document is still not retrieved for `pwq-002` (it scores under 0.1 for every wording tried). The first part is answered from the overview chunk instead.
 - `arch-002` faithfulness fell from 1.0 to 0.5 in run `20261003-211038`: retrieval was fine; the answer added a "General guidance (not from the docs)" block that the judge counts as unsupported. In run `20261009-143328` it is back at 1.0 with no related code change — an example of run-to-run variation.
 - `20261003-210709` and `20261008-164819` are disposable smoke runs. `20261008-165107` and `20261009-141503` are the two failed prompt attempts in the table above; they are kept as evidence and were not judge-scored.
-- `ui/eval_scorecard.json` was re-exported from run `20261009-143328`. Re-export it after any new scored run.
+- `ui/eval_scorecard.json` was re-exported from run `20261010-175028`. Re-export it after any new scored run.
 
 ## What the evals found
 
