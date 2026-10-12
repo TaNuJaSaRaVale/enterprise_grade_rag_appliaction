@@ -106,7 +106,7 @@ Details that matter:
 
 Not done yet: old threads are never deleted, so the tables grow slowly with use. Every saved turn also contains that turn's retrieved chunks.
 
-Known gap found while testing memory: the embedding guardrail (layer 1) answers "What did I just ask you?" with its own capabilities reply, so that message never reaches the graph. Follow-up questions that use the history ("how do I check **its** logs?") work.
+Gap found while testing memory, now fixed: the embedding guardrail (layer 1) answered "What did I just ask you?" with its own capabilities reply, so that message never reached the graph. The rails now have an "ask about conversation" intent that passes such messages on (see [`../guardrails/README.md`](../guardrails/README.md)). Follow-up questions that use the history ("how do I check **its** logs?") always worked.
 
 ## What changed while building this, and why
 

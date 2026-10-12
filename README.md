@@ -251,11 +251,11 @@ Required environment variables: `GROQ_API_KEY`, `GROQ_FALLBACK_API_KEY`, `PORTKE
 - **Done — ingestion reliability:** failures used to be only logged. The job now prints a per-file report and checks the chunk counts in Qdrant afterwards.
 - **The reranker is wording-sensitive.** A fixed 0.1 cutoff can drop a correct chunk when a question is phrased unusually. The system then says "not in the docs" instead of guessing, so the error is on the safe side → try a stronger reranker or a relative cutoff, and measure both.
 - **Query decomposition is tested on few questions** → add more multi-part goldens whose answers sit in different chunks.
-- **Answers sometimes add details that are not in the retrieved text** (unsupported specifics on `pwq-002`, an extra "General guidance" block on `arch-002` in one run); the judge counts them as unsupported → tighten the responder prompt.
+- **Done — answers that added details not in the retrieved text** (unsupported specifics on `pwq-002`, extra "General guidance" blocks): the responder prompt was tightened and Faithfulness rose from 0.89 to 0.99 (run `20261010-175028`).
 - **Scores vary between runs.** Each configuration was run once on 17 questions → repeat runs to report a range, and add more goldens.
 - **Done — persistent memory:** conversation memory moved from in-process to a Postgres checkpointer (Neon free tier), with a fallback to in-process memory if the database is unreachable.
 - **Memory housekeeping:** old conversation threads are never deleted → add a scheduled clean-up of threads older than a few days.
 - **Follow-up questions are tested on a handful of examples only** → add multi-turn goldens (a question plus a follow-up that needs the history) to the eval set.
-- **"What did I just ask?" is caught by the layer-1 guardrail** and gets the capabilities reply instead of an answer from memory → add it as a passing example in the rails.
+- **Done — questions about the conversation:** "What did I just ask you?" used to get the layer-1 guardrail's capabilities reply instead of an answer from memory. The rails now have an "ask about conversation" intent that passes such messages to the agent; the guardrails eval is unchanged (block rate 1.0, false-block rate 0.0).
 - **Judge bias:** the judge shares a model family with the answer model → spot-check verdicts; move to a cross-family judge when limits allow.
 - **Guardrails:** two layers now (embeddings + planner LLM), but the planner is evaluated on a small set that influenced its prompt → evaluate on a fresh, larger unseen set; add a dedicated prompt-injection classifier for injections hidden inside long technical questions.

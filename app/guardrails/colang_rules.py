@@ -157,6 +157,22 @@ define bot pass to rag
 define flow technical question
   user ask technical question
   bot pass to rag
+
+
+# Questions about the conversation itself ("what did I just ask you"). Without this intent they
+# sit closest to "what can I ask you" and get the capabilities reply, so conversation memory is
+# never reached. Passing them on lets the planner answer from the saved thread.
+define user ask about conversation
+  "what did I just ask you"
+  "what was my last question"
+  "what was my first question"
+  "what did we talk about so far"
+  "what did you just tell me"
+  "repeat my previous question"
+
+define flow conversation question
+  user ask about conversation
+  bot pass to rag
 """
 
 # embeddings_only: classify user intent by similarity to the example phrases above
